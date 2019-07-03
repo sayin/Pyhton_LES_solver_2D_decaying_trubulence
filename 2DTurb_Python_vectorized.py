@@ -439,15 +439,15 @@ s = fps(nx, ny, dx, dy, -w)
 s = bc(nx,ny,s)
 
 #%% coarsening
-def write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k):
+def write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k,freq):
     wc = np.zeros((nxc+3,nyc+3))
     sc = np.zeros((nxc+3,nyc+3))
     
     coarsen(nx,ny,nxc,nyc,w,wc)
-    wc = bc(nxc,nyc,wc)
+    wc = bc(nxc,nyc,wc) # coarse vorticitty field
     
     sc = fps(nxc, nyc, dxc, dyc, -wc)
-    sc = bc(nxc,nyc,sc)
+    sc = bc(nxc,nyc,sc) # coarse streamfunction field
 
     j = np.zeros((nx+3,ny+3)) # jacobian for fine solution field
     jc = np.zeros((nxc+3,nyc+3)) # coarsened(jacobian field)
@@ -460,9 +460,9 @@ def write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k):
     jcoarse[1:nxc+2,1:nyc+2] = jacobian(nxc,nyc,dxc,dyc,re,wc,sc)
     jcoarse = bc(nxc,nyc,jcoarse)
     
-    filename = "data/coarsened_field_jacobian/J_fourier_"+str(k)+".csv"
+    filename = "data/coarsened_jacobian_field/J_fourier_"+str(int(k/freq))+".csv"
     np.savetxt(filename, jc, delimiter=",")    
-    filename = "data/jacobian_coarsened/J_coarsen_"+str(k)+".csv"
+    filename = "data/jacobian_coarsened_field/J_coarsen_"+str(int(k/freq))+".csv"
     np.savetxt(filename, jcoarse, delimiter=",")   
     
     
@@ -504,7 +504,7 @@ for k in range(1,nt):
     s = bc(nx,ny,s)
     
     if (k%freq == 0):
-        write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k)
+        write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k,freq)
         print(k)
 
 total_clock_time = tm.time() - clock_time_init
