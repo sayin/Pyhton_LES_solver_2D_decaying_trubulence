@@ -7,6 +7,7 @@ Created on Thu Jul  4 09:37:02 2019
 """
 
 import numpy as np
+from scipy.integrate import simps
 from numpy.random import seed
 seed(1)
 import pyfftw
@@ -64,7 +65,7 @@ def les_filter(nx,ny,nxc,nyc,u,uc):
         
     uf[:,int(nyc/2):int(ny-nyc/2)] = 0.0
  
-    utc = np.real(np.fft.ifft2(uf))
+    utc = np.fft.ifft2(uf)
     
     uc[1:nx+1,1:ny+1] = np.real(utc)
     # periodic bc
@@ -74,14 +75,50 @@ def les_filter(nx,ny,nxc,nyc,u,uc):
     
     # ghost points BC
     uc = bc(nx,ny,uc)
+
+#%%
+def grad_spectral(nx,ny,u):
+    ux = np.empty((nx+3,ny+3))
+    uy = np.empty((nx+3,ny+3))
     
+    uf = np.fft.fft2(u[1:nx+1,1:ny+1])
+
+    kx = np.fft.fftfreq(nx,1/nx)
+    ky = np.fft.fftfreq(ny,1/ny)
+    
+    kx = kx.reshape(nx,1)
+    ky = ky.reshape(1,ny)
+    
+    uxf = 1.0j*kx*uf
+    uyf = 1.0j*ky*uf 
+    
+    ux[1:nx+1,1:ny+1] = np.real(np.fft.ifft2(uxf))
+    uy[1:nx+1,1:ny+1] = np.real(np.fft.ifft2(uyf))
+    
+    # periodic bc
+    ux[:,ny+1] = ux[:,1]
+    ux[nx+1,:] = ux[1,:]
+    ux[nx+1,ny+1] = ux[1,1]
+    # ghost points BC
+    ux = bc(nx,ny,ux)
+    
+    # periodic bc
+    uy[:,ny+1] = uy[:,1]
+    uy[nx+1,:] = uy[1,:]
+    uy[nx+1,ny+1] = uy[1,1]
+    # ghost points BC
+    uy = bc(nx,ny,uy)
+    
+    return ux,uy
+            
+            
 #%%
 def compute_velocity(nx,ny,dx,dy,s):
     u = np.empty((nx+3,ny+3))
     v = np.empty((nx+3,ny+3))
     
     u[1:nx+2,1:ny+2] = (s[1:nx+2,2:ny+3]-s[1:nx+2,0:ny+1])/(2.0*dy)
-    v[1:nx+2,1:ny+2] = (s[2:nx+3,1:ny+2]-s[0:nx+1,1:ny+2])/(2.0*dx)
+    v[1:nx+2,1:ny+2] =-(s[2:nx+3,1:ny+2]-s[0:nx+1,1:ny+2])/(2.0*dx)
     
     u = bc(nx,ny,u)
     v = bc(nx,ny,v)
@@ -146,9 +183,17 @@ def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
     a = (l11*m11 + 2.0*(l12*m12) + l22*m22)
     b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
-    CS2 = a/b  #Germano
+    #CS2 = a/b  #Germano
     
+    #x = np.linspace(0.0,2.0*np.pi,nxc+1)
+    #y = np.linspace(0.0,2.0*np.pi,nxc+1)
+    #ai = simps(simps(a[1:nxc+2,1:nyc+2],y),x)
+    #bi = simps(simps(b[1:nxc+2,1:nyc+2],y),x)
+    
+    #CS2 = ai/bi # using integration Lilly
+    CS2 = (np.sum(a)/np.sum(b))     #Lilly
     #CS2 = np.abs(np.sum(a)/np.sum(b))     #Lilly
+    #CS2 = 0.04 # constant
     
     return CS2
 
@@ -238,16 +283,18 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
     #CS = 0.2
     delta = np.sqrt(dxc*dyc)
     
+    ux,uy = grad_spectral(nxc,nyc,uc)
+    vx,vy = grad_spectral(nxc,nyc,vc)
     
-    ux[1:nxc+2,1:nyc+2] = (uc[2:nxc+3,1:nyc+2]-uc[0:nxc+1,1:nyc+2])/(2.0*dxc)
-    uy[1:nxc+2,1:nyc+2] = (uc[1:nxc+2,2:nyc+3]-uc[1:nxc+2,0:nyc+1])/(2.0*dyc)
-    vx[1:nxc+2,1:nyc+2] = (vc[2:nxc+3,1:nyc+2]-vc[0:nxc+1,1:nyc+2])/(2.0*dxc)
-    vy[1:nxc+2,1:nyc+2] = (vc[1:nxc+2,2:nyc+3]-vc[1:nxc+2,0:nyc+1])/(2.0*dyc)
-    
-    ux = bc(nxc,nyc,ux)
-    uy = bc(nxc,nyc,uy)
-    vx = bc(nxc,nyc,vx)
-    vy = bc(nxc,nyc,vy)
+#    ux[1:nxc+2,1:nyc+2] = (uc[2:nxc+3,1:nyc+2]-uc[0:nxc+1,1:nyc+2])/(2.0*dxc)
+#    uy[1:nxc+2,1:nyc+2] = (uc[1:nxc+2,2:nyc+3]-uc[1:nxc+2,0:nyc+1])/(2.0*dyc)
+#    vx[1:nxc+2,1:nyc+2] = (vc[2:nxc+3,1:nyc+2]-vc[0:nxc+1,1:nyc+2])/(2.0*dxc)
+#    vy[1:nxc+2,1:nyc+2] = (vc[1:nxc+2,2:nyc+3]-vc[1:nxc+2,0:nyc+1])/(2.0*dyc)
+#    
+#    ux = bc(nxc,nyc,ux)
+#    uy = bc(nxc,nyc,uy)
+#    vx = bc(nxc,nyc,vx)
+#    vy = bc(nxc,nyc,vy)
     
     d11 = ux
     d12 = 0.5*(uy+vx)
@@ -257,7 +304,7 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
     
     CS2 = compute_cs(dxc,dyc,nxc,nyc,uc,vc,da,d11,d12,d22)
     
-    print(n, " CS = ", np.max(np.sqrt(CS2)), " ", np.min(np.sqrt(CS2)))
+    print(n, " CS = ", np.sqrt(np.max(CS2)), " ", np.sqrt(np.abs(np.min(CS2))))
        
     t11_s = - 2.0*CS2*delta*delta*da*d11
     t12_s = - 2.0*CS2*delta*delta*da*d12
@@ -318,9 +365,11 @@ dyc = ly/np.float64(nyc)
 for n in range(1,ns+1):
     file_input = "data/streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')
-    u,v = compute_velocity(nx,ny,dx,dy,s)
+    #u,v = compute_velocity(nx,ny,dx,dy,s)
+    sx,sy = grad_spectral(nx,ny,s)
+    u = sy
+    v = -sx
     compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n)
-
 
 #%%
 #def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):

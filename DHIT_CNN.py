@@ -147,11 +147,11 @@ plt.colorbar()
 plt.show()
 
 #%%
-p, x = np.histogram(y_test[4,:,:,0], bins=64)
+p, x = np.histogram(y_test[3,:,:,0], bins=64)
 x = x[:-1] + (x[1] - x[0])/2 
 f = UnivariateSpline(x, p, s=64)
 
-q, y = np.histogram(y_prediction[4,:,:,0], bins=64)
+q, y = np.histogram(y_prediction[3,:,:,0], bins=64)
 y = y[:-1] + (y[1] - y[0])/2 
 g = UnivariateSpline(y, q, s=64)
 
@@ -173,27 +173,32 @@ first.add(model2.layers[1])
 first.compile(optimizer='adam',loss='mean_squared_error')
 out_first = first.predict(test_image)
 
-f,ax = plt.subplots(4,4, figsize=(8,16))
+f,ax = plt.subplots(4,4, figsize=(8,8), constrained_layout=True)
 for i in range(16):
     img = out_first[0,:,:,i]
     img = (img - np.min(img)) / (np.max(img) - np.min(img)) * 255
-    ax[i//4,i%4].imshow(img, cmap='jet')
+    ax[i//4,i%4].contourf(img, cmap='jet')
     ax[i//4,i%4].axis('off')
 f.tight_layout()
+f.suptitle('first layer')
 
+#%%
 second = Sequential()
 second.add(model2.layers[0])
 second.add(model2.layers[1])
 second.add(model2.layers[2])
 second.compile(optimizer='adam',loss='mean_squared_error')
 out_second = second.predict(test_image)
-f,ax = plt.subplots(2,4, figsize=(8,16))
+f,ax = plt.subplots(2,4, figsize=(8,8))
 for i in range(8):
     img = out_second[0,:,:,i]
     img = (img - np.min(img)) / (np.max(img) - np.min(img)) * 255
-    ax[i//4,i%4].imshow(img, cmap='gray')
+    ax[i//4,i%4].imshow(img, cmap='jet')
     ax[i//4,i%4].axis('off')
+f.tight_layout()
+f.suptitle('second layer')
 
+#%%
 third = Sequential()
 third.add(model2.layers[0])
 third.add(model2.layers[1])
@@ -201,13 +206,16 @@ third.add(model2.layers[2])
 third.add(model2.layers[3])
 third.compile(optimizer='adam',loss='mean_squared_error')
 out_third = third.predict(test_image)
-f,ax = plt.subplots(2,4, figsize=(8,16))
+f,ax = plt.subplots(2,4, figsize=(8,8))
 for i in range(8):
     img = out_third[0,:,:,i]
     img = (img - np.min(img)) / (np.max(img) - np.min(img)) * 255
-    ax[i//4,i%4].imshow(img, cmap='gray')
+    ax[i//4,i%4].imshow(img, cmap='jet')
     ax[i//4,i%4].axis('off')
-    
+f.tight_layout()
+f.suptitle('third layer')
+
+#%%
 fourth = Sequential()
 fourth.add(model2.layers[0])
 fourth.add(model2.layers[1])
@@ -216,13 +224,16 @@ fourth.add(model2.layers[3])
 fourth.add(model2.layers[4])
 fourth.compile(optimizer='adam',loss='mean_squared_error')
 out_fourth = fourth.predict(test_image)
-f,ax = plt.subplots(2,4, figsize=(8,16))
+f,ax = plt.subplots(2,4, figsize=(8,8))
 for i in range(8):
     img = out_fourth[0,:,:,i]
     img = (img - np.min(img)) / (np.max(img) - np.min(img)) * 255
-    ax[i//4,i%4].imshow(img, cmap='gray')
+    ax[i//4,i%4].imshow(img, cmap='jet')
     ax[i//4,i%4].axis('off')  
-    
+f.tight_layout()
+f.suptitle('fourth layer')
+
+#%%   
 sixth = Sequential()
 sixth.add(model2.layers[0])
 sixth.add(model2.layers[1])
@@ -233,9 +244,11 @@ sixth.add(model2.layers[5])
 sixth.add(model2.layers[6])
 sixth.compile(optimizer='adam',loss='mean_squared_error')
 out_sixth = sixth.predict(test_image)
-f,ax = plt.subplots(4,4, figsize=(8,16))
+f,ax = plt.subplots(4,4, figsize=(8,8))
 for i in range(16):
     img = out_sixth[0,:,:,i]
     img = (img - np.min(img)) / (np.max(img) - np.min(img)) * 255
-    ax[i//4,i%4].imshow(img, cmap='gray')
+    ax[i//4,i%4].contourf(img, cmap='jet')
     ax[i//4,i%4].axis('off')
+f.tight_layout()
+f.suptitle('sixth layer')

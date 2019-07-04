@@ -161,8 +161,8 @@ def rhs(nx,ny,dx,dy,re,w,s):
         + bb*(w[1:nx+2,2:ny+3]-2.0*w[1:nx+2,1:ny+2]+w[1:nx+2,0:ny+1])
     
     #call Smagorinsky model       
-    cs = 0.18
-    ev = smag(nx,ny,dx,dy,s,cs)
+    #cs = 0.18
+    #ev = smag(nx,ny,dx,dy,s,cs)
     
     #Central difference for Laplacian
     # f[1:nx+2,1:ny+2] = -jac + lap/re + ev*lap if using eddy viscosity model for LES
