@@ -20,21 +20,35 @@ class DHIT:
         self.f,self.ue = self.gen_data()
         
     def gen_data(self):
+        n_snapshots_train = self.n_snapshots - 5
+        n_snapshots_test = 5
         
-        f  = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1, 1), dtype='double')
-        ue = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1, 1), dtype='double')
+        f_train  = np.zeros(shape=(n_snapshots_train, self.nx+1, self.ny+1, 1), dtype='double')
+        ue_train = np.zeros(shape=(n_snapshots_train, self.nx+1, self.ny+1, 1), dtype='double')
         
-        for n in range(1,self.n_snapshots):
+        f_test  = np.zeros(shape=(n_snapshots_test, self.nx+1, self.ny+1, 1), dtype='double')
+        ue_test = np.zeros(shape=(n_snapshots_test, self.nx+1, self.ny+1, 1), dtype='double')
+        
+        for n in range(1,n_snapshots_train):
             file_input = "../data/jacobian_coarsened_field/J_coarsen_"+str(n)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
-            f[n,:,:,0] = data_input[1:self.nx+2, 1:self.ny+2]
+            f_train[n,:,:,0] = data_input[1:self.nx+2, 1:self.ny+2]
                        
-            file_output = "../data/coarsened_jacobian_field/J_fourier_"+str(n)+".csv"
+            file_output = "../data/subgrid_scale_term/sgs_"+str(n)+".csv"
             data_output = np.genfromtxt(file_output, delimiter=',')
-            lv = data_input - data_output   # SGS term
-            ue[n,:,:,0] = lv[1:self.nx+2, 1:self.ny+2]
+            ue_train[n,:,:,0] = data_output[1:self.nx+2, 1:self.ny+2]
             
-        return f, ue
+        for n in range(n_snapshots_test):
+            p = 45 + n
+            file_input = "../data/jacobian_coarsened_field/J_coarsen_"+str(p)+".csv"
+            data_input = np.genfromtxt(file_input, delimiter=',')
+            f_test[n,:,:,0] = data_input[1:self.nx+2, 1:self.ny+2]
+                       
+            file_output = "../data/subgrid_scale_term/sgs_"+str(p)+".csv"
+            data_output = np.genfromtxt(file_output, delimiter=',')
+            ue_test[n,:,:,0] = data_output[1:self.nx+2, 1:self.ny+2]
+            
+        return f_train, ue_train, f_test, ue_test
     
 #%%
 #Class of problem to solve 2D Taylor Green Vortex
@@ -100,22 +114,17 @@ class CNN:
     def CNN_predict(self,ftest):
         y_predict = self.model.predict(ftest)
         return y_predict
+    
     def CNN_info(self):
         self.model.summary()
         
     def CNN_save(self,model_name):
         self.model.save(model_name)
         
-#%% TGV data
-obj = TGV(dt=8.0e-3,final_time=1.0,Re_N=10,kappa=2,nx=64,ny=64)
-x_train,y_train = obj.f,obj.ue
-nt,nx,ny,nci=x_train.shape
-nt,nx,ny,nco=y_train.shape 
-
-
 #%%
 obj = DHIT(n_snapshots=50,nx=64,ny=64)
-x_train,y_train = obj.f,obj.ue
+x_train,y_train = obj.f_train,obj.ue_train
+x_test,y_test = obj.f_train,obj.ue_train
 nt,nx,ny,nci=x_train.shape
 nt,nx,ny,nco=y_train.shape 
 
