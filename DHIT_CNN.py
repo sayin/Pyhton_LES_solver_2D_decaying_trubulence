@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from keras.models import Sequential, Model
 from keras.layers import Input, Conv2D
+from scipy.interpolate import UnivariateSpline
 
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
@@ -17,7 +18,7 @@ class DHIT:
         self.nx = nx
         self.ny = ny
         self.n_snapshots = n_snapshots
-        self.f,self.ue = self.gen_data()
+        self.f_train,self.ue_train,self.f_test,self.ue_test = self.gen_data()
         
     def gen_data(self):
         n_snapshots_train = self.n_snapshots - 5
@@ -30,21 +31,21 @@ class DHIT:
         ue_test = np.zeros(shape=(n_snapshots_test, self.nx+1, self.ny+1, 1), dtype='double')
         
         for n in range(1,n_snapshots_train):
-            file_input = "../data/jacobian_coarsened_field/J_coarsen_"+str(n)+".csv"
+            file_input = "data/jacobian_coarsened_field/J_coarsen_"+str(n)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             f_train[n,:,:,0] = data_input[1:self.nx+2, 1:self.ny+2]
                        
-            file_output = "../data/subgrid_scale_term/sgs_"+str(n)+".csv"
+            file_output = "data/subgrid_scale_term/sgs_"+str(n)+".csv"
             data_output = np.genfromtxt(file_output, delimiter=',')
             ue_train[n,:,:,0] = data_output[1:self.nx+2, 1:self.ny+2]
             
         for n in range(n_snapshots_test):
             p = 45 + n
-            file_input = "../data/jacobian_coarsened_field/J_coarsen_"+str(p)+".csv"
+            file_input = "data/jacobian_coarsened_field/J_coarsen_"+str(p)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             f_test[n,:,:,0] = data_input[1:self.nx+2, 1:self.ny+2]
                        
-            file_output = "../data/subgrid_scale_term/sgs_"+str(p)+".csv"
+            file_output = "data/subgrid_scale_term/sgs_"+str(p)+".csv"
             data_output = np.genfromtxt(file_output, delimiter=',')
             ue_test[n,:,:,0] = data_output[1:self.nx+2, 1:self.ny+2]
             
@@ -124,7 +125,7 @@ class CNN:
 #%%
 obj = DHIT(n_snapshots=50,nx=64,ny=64)
 x_train,y_train = obj.f_train,obj.ue_train
-x_test,y_test = obj.f_train,obj.ue_train
+x_test,y_test = obj.f_test,obj.ue_test
 nt,nx,ny,nci=x_train.shape
 nt,nx,ny,nco=y_train.shape 
 
@@ -135,15 +136,30 @@ model.CNN_info()
 model.CNN_compile(optimizer='adam')
 model.CNN_train(epochs=1000,batch_size=32)
 model.CNN_save('savedmodel.h5')
-y_prediction=model.CNN_predict(x_train)
+y_prediction=model.CNN_predict(x_test)
 
 #%%
-plt.contourf(y_train[49,:,:,0])
+plt.contourf(y_test[4,:,:,0])
 plt.colorbar()
 plt.show()
-plt.contourf(y_prediction[49,:,:,0])
+plt.contourf(y_prediction[4,:,:,0])
 plt.colorbar()
 plt.show()
+
+#%%
+p, x = np.histogram(y_test[4,:,:,0], bins=64)
+x = x[:-1] + (x[1] - x[0])/2 
+f = UnivariateSpline(x, p, s=64)
+
+q, y = np.histogram(y_prediction[4,:,:,0], bins=64)
+y = y[:-1] + (y[1] - y[0])/2 
+g = UnivariateSpline(y, q, s=64)
+
+plt.plot(x, f(x), label="True")
+plt.plot(y, g(y), label="CNN")
+plt.legend()
+plt.show()
+
 
 #%%
 #Code for viasualizing the input after the applicaiton of the first layer

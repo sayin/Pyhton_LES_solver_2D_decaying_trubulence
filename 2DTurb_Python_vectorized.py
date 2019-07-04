@@ -165,206 +165,12 @@ def rhs(nx,ny,dx,dy,re,w,s):
     ev = smag(nx,ny,dx,dy,s,cs)
     
     #Central difference for Laplacian
-    f[1:nx+2,1:ny+2] = -jac + lap/re + ev*lap
+    # f[1:nx+2,1:ny+2] = -jac + lap/re + ev*lap if using eddy viscosity model for LES
+    
+    f[1:nx+2,1:ny+2] = -jac + lap/re 
                         
     return f
 
-#%%
-def compute_velocity(nx,ny,dx,dy,s):
-    u = np.empty((nx+3,ny+3))
-    v = np.empty((nx+3,ny+3))
-    
-    u[1:nx+2,1:ny+2] = (s[1:nx+2,2:ny+3]-s[1:nx+2,0:ny+1])/(2.0*dy)
-    v[1:nx+2,1:ny+2] = (s[2:nx+3,1:ny+2]-s[0:nx+1,1:ny+2])/(2.0*dx)
-    
-    u = bc(nx,ny,u)
-    v = bc(nx,ny,v)
-    
-    return u, v
-
-#%%
-def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
-    
-    alpha = 2.0
-    nxcc = int(nxc/alpha)
-    nycc = int(nyc/alpha)
-    ucc = np.empty((nxcc+3,nycc+3))
-    vcc = np.empty((nxcc+3,nycc+3))
-    uucc = np.empty((nxcc+3,nycc+3))
-    uvcc = np.empty((nxcc+3,nycc+3))
-    vvcc = np.empty((nxcc+3,nycc+3))
-    
-    dacc = np.empty((nxcc+3,nycc+3))
-    d11cc = np.empty((nxcc+3,nycc+3))
-    d12cc = np.empty((nxcc+3,nycc+3))
-    d22cc = np.empty((nxcc+3,nycc+3))
-    h11cc = np.empty((nxcc+3,nycc+3))
-    h12cc = np.empty((nxcc+3,nycc+3))
-    h22cc = np.empty((nxcc+3,nycc+3))
-
-    
-    coarsen(nxc,nyc,nxcc,nycc,uc,ucc)
-    coarsen(nxc,nyc,nxcc,nycc,vc,vcc)
-    
-    uuc = uc*uc
-    vvc = vc*vc
-    uvc = uc*vc
-    
-    coarsen(nxc,nyc,nxcc,nycc,uuc,uucc)
-    coarsen(nxc,nyc,nxcc,nycc,uvc,uvcc)
-    coarsen(nxc,nyc,nxcc,nycc,vvc,vvcc)
-    
-    coarsen(nxc,nyc,nxcc,nycc,dac,dacc)
-    coarsen(nxc,nyc,nxcc,nycc,d11c,d11cc)
-    coarsen(nxc,nyc,nxcc,nycc,d12c,d12cc)
-    coarsen(nxc,nyc,nxcc,nycc,d22c,d22cc)
-    
-    h11c = dac*d11c
-    h12c = dac*d12c
-    h22c = dac*d22c
-    
-    coarsen(nxc,nyc,nxcc,nycc,h11c,h11cc)
-    coarsen(nxc,nyc,nxcc,nycc,h12c,h12cc)
-    coarsen(nxc,nyc,nxcc,nycc,h22c,h22cc)
-    
-    l11 = uucc - ucc*ucc
-    l12 = uvcc - ucc*vcc
-    l22 = vvcc - vcc*vcc
-    
-    delta2 = dxc*dyc
-    
-    m11 = 2.0*delta2*(h11cc-alpha*alpha*np.abs(dacc)*d11cc)
-    m12 = 2.0*delta2*(h12cc-alpha*alpha*np.abs(dacc)*d12cc)
-    m22 = 2.0*delta2*(h22cc-alpha*alpha*np.abs(dacc)*d22cc)
-    
-    a = (l11*m11 + 2.0*(l12*m12) + l22*m22)
-    b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
-    
-    CS2 = a/b  #Germano
-    
-    #CS2 = np.abs(np.sum(a)/np.sum(b))     #Lilly
-    
-    return CS2
-    
-    
-    
-    
-#%%
-#def les_filter(nx,ny,u):
-#    uf = np.empty((nx+3,ny+3))
-#    
-#    uf[1:nx+2,1:ny+2] = ( 4.0*u[1:nx+2,1:ny+2] \
-#                          + 2.0*u[2:nx+3,1:ny+2] \
-#                          + 2.0*u[0:nx+1,1:ny+2] \
-#                          + 2.0*u[1:nx+2,2:ny+3] \
-#                          + 2.0*u[1:nx+2,0:ny+1] \
-#                          + u[2:nx+3,0:ny+1] \
-#                          + u[0:nx+1,0:ny+1] \
-#                          + u[0:nx+1,2:ny+3] \
-#                          + u[2:nx+3,2:ny+3])/16.0
-#    
-#    uf = bc(nx,ny,uf)
-#    
-#    return uf
-#       
-#%%
-def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,k,freq):
-    uc = np.empty((nxc+3,nyc+3))
-    vc = np.empty((nxc+3,nyc+3))
-    t11 = np.empty((nxc+3,nyc+3))
-    t12 = np.empty((nxc+3,nyc+3))
-    t22 = np.empty((nxc+3,nyc+3))
-    t11_s = np.empty((nxc+3,nyc+3))
-    t12_s = np.empty((nxc+3,nyc+3))
-    t22_s = np.empty((nxc+3,nyc+3))
-    
-    uu = np.empty((nx+3,ny+3))
-    uv = np.empty((nx+3,ny+3))
-    vv = np.empty((nx+3,ny+3))
-    uuc = np.empty((nxc+3,nyc+3))
-    uvc = np.empty((nxc+3,nyc+3))
-    vvc = np.empty((nxc+3,nyc+3))
-    
-    ux = np.empty((nx+3,ny+3))
-    uy = np.empty((nx+3,ny+3))
-    vx = np.empty((nx+3,ny+3))
-    vy = np.empty((nx+3,ny+3))
-    
-    uu = u*u
-    uv = u*v
-    vv = v*v
-    
-    coarsen(nx,ny,nxc,nyc,u,uc)
-    coarsen(nx,ny,nxc,nyc,v,vc)
-    coarsen(nx,ny,nxc,nyc,uu,uuc)
-    coarsen(nx,ny,nxc,nyc,uv,uvc)
-    coarsen(nx,ny,nxc,nyc,vv,vvc)
-    
-    #True (deviatoric stress)
-    t11 = uuc -uc*uc
-    t12 = uvc -uc*vc
-    t22 = vvc -vc*vc
-    
-    t11d = t11 - 0.5*(t11+t22)
-    t22d = t22 - 0.5*(t11+t22)
-    
-    filename = "data/uc/uc_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, uc, delimiter=",")
-    filename = "data/vc/vc_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, vc, delimiter=",")
-    
-    filename = "data/uuc/uuc_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, uuc, delimiter=",")
-    filename = "data/uvc/uvc_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, uvc, delimiter=",")
-    filename = "data/vvc/vvc_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, vvc, delimiter=",")
-    
-    filename = "data/t11/t11_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, t11d, delimiter=",")
-    filename = "data/t12/t12_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, t12, delimiter=",")
-    filename = "data/t22/t22_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, t22d, delimiter=",")
-    
-    #Smagorinsky
-    #CS = 0.2
-    delta = np.sqrt(dxc*dyc)
-    
-    
-    ux[1:nxc+2,1:nyc+2] = (uc[2:nxc+3,1:nyc+2]-uc[0:nxc+1,1:nyc+2])/(2.0*dxc)
-    uy[1:nxc+2,1:nyc+2] = (uc[1:nxc+2,2:nyc+3]-uc[1:nxc+2,0:nyc+1])/(2.0*dyc)
-    vx[1:nxc+2,1:nyc+2] = (vc[2:nxc+3,1:nyc+2]-vc[0:nxc+1,1:nyc+2])/(2.0*dxc)
-    vy[1:nxc+2,1:nyc+2] = (vc[1:nxc+2,2:nyc+3]-vc[1:nxc+2,0:nyc+1])/(2.0*dyc)
-    
-    ux = bc(nxc,nyc,ux)
-    uy = bc(nxc,nyc,uy)
-    vx = bc(nxc,nyc,vx)
-    vy = bc(nxc,nyc,vy)
-    
-    d11 = ux
-    d12 = 0.5*(uy+vx)
-    d22 = vy
-
-    da = np.sqrt(2.0*ux*ux + 2.0*vy*vy + (uy+vx)*(uy+vx))
-    
-    CS2 = compute_cs(dxc,dyc,nxc,nyc,uc,vc,da,d11,d12,d22)
-    
-    print(k, " CS = ", np.max(np.sqrt(CS2)), " ", np.min(np.sqrt(CS2)))
-    
-    t11_s = - 2.0*CS2*delta*delta*da*d11
-    t12_s = - 2.0*CS2*delta*delta*da*d12
-    t22_s = - 2.0*CS2*delta*delta*da*d22
-    
-    filename = "data/t11s/t11s_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, t11_s, delimiter=",")
-    filename = "data/t12s/t12s_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, t12_s, delimiter=",")
-    filename = "data/t22s/t22s_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, t22_s, delimiter=",")
-    
-    
-    
 #%%
 # compute exact solution for TGV problem
 def exact_tgv(nx,ny,x,y,time,re):
@@ -663,6 +469,10 @@ def write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k,freq):
     np.savetxt(filename, jcoarse, delimiter=",")
     filename = "data/subgrid_scale_term/sgs_"+str(int(k/freq))+".csv"
     np.savetxt(filename, sgs, delimiter=",")
+    filename = "data/vorticity/w_"+str(int(k/freq))+".csv"
+    np.savetxt(filename, w, delimiter=",")
+    filename = "data/streamfunction/s_"+str(int(k/freq))+".csv"
+    np.savetxt(filename, s, delimiter=",")
     
     
 #%%
@@ -703,18 +513,16 @@ for k in range(1,nt+1):
     s = bc(nx,ny,s)
     
     if (k%freq == 0):
-        u,v = compute_velocity(nx,ny,dx,dy,s)
-        compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,k,freq)
+        #u,v = compute_velocity(nx,ny,dx,dy,s)
+        #compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,k,freq)
         write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k,freq)
-        #print(k, " ", time)
+        print(k, " ", time)
 
 total_clock_time = tm.time() - clock_time_init
 print('Total clock time=', total_clock_time)
 
 if (ipr == 1):
     we = exact_tgv(nx,ny,x,y,time,re)
-
-
 
 #%%
 np.savetxt("initial_"+str(nd)+"_"+str(re)+".csv", w0, delimiter=",")    
@@ -752,7 +560,7 @@ plt.show()
 fig.savefig("contour.png", bbox_inches = 'tight')
 
 #%%
-fine_es = np.loadtxt('energy_spectrum.csv') 
+fine_es = np.loadtxt('energy_spectrum_256.csv') 
 
 #%%
 fig, ax = plt.subplots()
