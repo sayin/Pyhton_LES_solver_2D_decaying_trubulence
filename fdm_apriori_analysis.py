@@ -183,7 +183,7 @@ def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
     a = (l11*m11 + 2.0*(l12*m12) + l22*m22)
     b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
-    #CS2 = a/b  #Germano
+    CS2 = a/b  #Germano
     
     #x = np.linspace(0.0,2.0*np.pi,nxc+1)
     #y = np.linspace(0.0,2.0*np.pi,nxc+1)
@@ -191,7 +191,7 @@ def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
     #bi = simps(simps(b[1:nxc+2,1:nyc+2],y),x)
     
     #CS2 = ai/bi # using integration Lilly
-    CS2 = (np.sum(a)/np.sum(b))     #Lilly
+    #CS2 = (np.sum(a)/np.sum(b))     #Lilly
     #CS2 = np.abs(np.sum(a)/np.sum(b))     #Lilly
     #CS2 = 0.04 # constant
     
@@ -258,22 +258,22 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
     t11d = t11 - 0.5*(t11+t22)
     t22d = t22 - 0.5*(t11+t22)
     
-    filename = "data/uc/uc_"+str(int(n))+".csv"
+    filename = "fdm/data/uc/uc_"+str(int(n))+".csv"
     np.savetxt(filename, uc, delimiter=",")
-    filename = "data/vc/vc_"+str(int(n))+".csv"
+    filename = "fdm/data/vc/vc_"+str(int(n))+".csv"
     np.savetxt(filename, vc, delimiter=",")
-    filename = "data/uuc/uuc_"+str(int(n))+".csv"
+    filename = "fdm/data/uuc/uuc_"+str(int(n))+".csv"
     np.savetxt(filename, uuc, delimiter=",")
-    filename = "data/uvc/uvc_"+str(int(n))+".csv"
+    filename = "fdm/data/uvc/uvc_"+str(int(n))+".csv"
     np.savetxt(filename, uvc, delimiter=",")
-    filename = "data/vvc/vvc_"+str(int(n))+".csv"
+    filename = "fdm/data/vvc/vvc_"+str(int(n))+".csv"
     np.savetxt(filename, vvc, delimiter=",")
     
     t[0,:,:] = t11d
     t[1,:,:] = t12
     t[2,:,:] = t22d
     
-    with open("data/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
+    with open("fdm/data/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
         outfile.write('# Array shape: {0}\n'.format(t.shape))
         for data_slice in t:
             np.savetxt(outfile, data_slice, delimiter=",")
@@ -314,7 +314,7 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
     t_s[1,:,:] = t12_s
     t_s[2,:,:] = t22_s
     
-    with open("data/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
+    with open("fdm/data/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
         outfile.write('# Array shape: {0}\n'.format(t.shape))
         for data_slice in t_s:
             np.savetxt(outfile, data_slice, delimiter=",")
@@ -363,7 +363,7 @@ dxc = lx/np.float64(nxc)
 dyc = ly/np.float64(nyc)
 #%%
 for n in range(1,ns+1):
-    file_input = "data/streamfunction/s_"+str(n)+".csv"
+    file_input = "fdm/data/05_streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')
     #u,v = compute_velocity(nx,ny,dx,dy,s)
     sx,sy = grad_spectral(nx,ny,s)

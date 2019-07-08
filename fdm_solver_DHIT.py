@@ -559,7 +559,7 @@ fig.savefig("field_fdm.png", bbox_inches = 'tight')
 
 #%%
 if (ipr == 3):
-    #en_s = np.loadtxt("energy_spectral_256_4000.csv")#+str(nd)+"_"+str(int(re))+".csv") 
+    en_s = np.loadtxt("spectral/energy_spectral_"+str(nd)+"_"+str(int(re))+".csv") 
     fig, ax = plt.subplots()
     fig.set_size_inches(7,5)
     
@@ -568,14 +568,14 @@ if (ipr == 3):
     ax.loglog(k,ese[:],'k', lw = 2, label='Exact')
     ax.loglog(k,en0[1:],'r', ls = '--', lw = 2, label='$t = 0.0$')
     ax.loglog(k,en[1:], 'b', lw = 2, label = '$t = '+str(dt*nt)+'$')
-    #ax.loglog(k[:180],en_s[1:], 'y', lw = 2, label = '$t = '+str(dt*nt)+'$'+' spectral 256')
+    ax.loglog(k,en_s[1:], 'y', lw = 2, label = '$t = '+str(dt*nt)+'$'+' spectral 1024')
     ax.loglog(k,line, 'g--', lw = 2, label = 'k^-3')
     
     
     plt.xlabel('$K$')
     plt.ylabel('$E(K)$')
     plt.legend(loc=0)
-    plt.ylim(1e-8,1e-1)
+    plt.ylim(1e-19,1e-1)
     fig.savefig('es_fdm.png', bbox_inches = 'tight', pad_inches = 0)
     
 

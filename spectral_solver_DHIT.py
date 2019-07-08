@@ -240,29 +240,19 @@ def energy_spectrum(nx,ny,w):
         
     return en, n
 
+
 #%%
 # fast poisson solver using second-order central difference scheme
 def fps(nx,ny,dx,dy,k2,f):
     u = np.zeros((nx+1,ny+1))
-    
-    data = np.empty((nx,ny), dtype='complex128')
-    data1 = np.empty((nx,ny), dtype='complex128')
-    
-    # create data using the dource term as the real part and 0.0 as the imaginary part
-    data = np.add(f[0:nx,0:ny], 0.0j)
-       
+         
     a = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
     b = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
     
-    fft_object = pyfftw.FFTW(a, b, axes = (0,1), direction = 'FFTW_FORWARD')
     fft_object_inv = pyfftw.FFTW(a, b,axes = (0,1), direction = 'FFTW_BACKWARD')
-    
-    # compute the fourier transform
-    e = fft_object(data)    
-    e[0,0] = 0.0
-    
+       
     # the donominator is based on the scheme used for discrtetizing the Poisson equation
-    data1 = e/(-k2)
+    data1 = f/(-k2)
     
     # compute the inverse fourier transform
     u[0:nx,0:ny] = np.real(fft_object_inv(data1))
@@ -270,10 +260,9 @@ def fps(nx,ny,dx,dy,k2,f):
     
     return u
 
+
 #%%
-def coarsen(nx,ny,nxc,nyc,u,uc):
-    uf = np.fft.fft2(u[0:nx,0:ny]) #
-    
+def coarsen(nx,ny,nxc,nyc,uf):  
     ufc = np.zeros((nxc,nyc),dtype='complex')
     
     ufc[0:int(nxc/2),0:int(nyc/2)] = uf[0:int(nxc/2),0:int(nyc/2)]
@@ -283,10 +272,7 @@ def coarsen(nx,ny,nxc,nyc,u,uc):
     
     ufc = ufc*(nxc*nyc)/(nx*ny)
     
-    utc = np.real(np.fft.ifft2(ufc))
-    
-    uc[0:nxc,0:nyc] = np.real(utc)
-    pbc(nxc,nyc,uc)
+    return ufc
 
        
 #%%
@@ -412,10 +398,10 @@ def nonlinear(nx,ny,kx,ky,k2,wf):
     
     return jf
 
+
 #%% coarsening
-def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,w,n,freq):
-    s = np.zeros((nx+1,ny+1))
-    s = fps(nx,ny,dx,dy,k2,w)
+def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,n,freq):
+    s = fps(nx,ny,dx,dy,k2,wf)
    
     kxc = np.fft.fftfreq(nxc,1/nxc)
     kyc = np.fft.fftfreq(nyc,1/nyc)
@@ -425,28 +411,16 @@ def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,w,n,freq):
     k2c = kxc*kxc + kyc*kyc
     k2c[0,0] = 1.0e-12
      
-    af = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
-    bf = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
-    fft_object = pyfftw.FFTW(af, bf, axes = (0,1), direction = 'FFTW_FORWARD')
-    
-    wf = fft_object(w[0:nx,0:ny])
-    
     jf = nonlineardealiased(nx,ny,kx,ky,k2,wf)
     j = wave2phy(nx,ny,jf) # jacobian for fine solution field
 
     jc = np.zeros((nxc+1,nyc+1)) # coarsened(jacobian field)
-    coarsen(nx,ny,nxc,nyc,j,jc)
-    
-    ac = pyfftw.empty_aligned((nxc,nyc),dtype= 'complex128')
-    bc = pyfftw.empty_aligned((nxc,nyc),dtype= 'complex128')
-    fft_object = pyfftw.FFTW(ac, bc, axes = (0,1), direction = 'FFTW_FORWARD')
-    
-    wc = np.zeros((nxc+1,nyc+1))
-    coarsen(nx,ny,nxc,nyc,w,wc) 
-    wcf = fft_object(wc[0:nxc,0:nyc])
-        
-    jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wcf)
-    jcoarse = wave2phy(nxc,nyc,jcoarsef) # jacobian(coarsened solution field)
+    jfc = coarsen(nx,ny,nxc,nyc,jf) # coarsened(jacobian field) in frequency domain
+    jc = wave2phy(nxc,nyc,jfc) # coarsened(jacobian field) physical space
+       
+    wfc = coarsen(nx,ny,nxc,nyc,wf)       
+    jcoarsef = nonlineardealiased(nxc,nyc,kxc,kyc,k2c,wfc) # jacobian(coarsened solution field) in frequency domain
+    jcoarse = wave2phy(nxc,nyc,jcoarsef) # jacobian(coarsened solution field) physical space
     
     sgs = jc - jcoarse
     
@@ -510,21 +484,21 @@ w2f = np.empty((nx,ny), dtype='complex128')
 clock_time_init = tm.time()
 for n in range(1,nt+1):
     time = time + dt
-    jnf = nonlinear(nx,ny,kx,ky,k2,wnf)    
+    jnf = nonlineardealiased(nx,ny,kx,ky,k2,wnf)    
     w1f[:,:] = ((1.0 - d1)/(1.0 + d1))*wnf[:,:] + (g1*dt*jnf[:,:])/(1.0 + d1)
     w1f[0,0] = 0.0
     
-    j1f = nonlinear(nx,ny,kx,ky,k2,w1f)
+    j1f = nonlineardealiased(nx,ny,kx,ky,k2,w1f)
     w2f[:,:] = ((1.0 - d2)/(1.0 + d2))*w1f[:,:] + (r2*dt*jnf[:,:]+ g2*dt*j1f[:,:])/(1.0 + d2)
     w2f[0,0] = 0.0
     
-    j2f = nonlinear(nx,ny,kx,ky,k2,w2f)
+    j2f = nonlineardealiased(nx,ny,kx,ky,k2,w2f)
     wnf[:,:] = ((1.0 - d3)/(1.0 + d3))*w2f[:,:] + (r3*dt*j1f[:,:] + g3*dt*j2f[:,:])/(1.0 + d3)
     wnf[0,0] = 0.0
     
     if (n%freq == 0):
-        w = wave2phy(nx,ny,wnf)
-        write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,w,n,freq)
+        #w = wave2phy(nx,ny,wnf)
+        write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wnf,n,freq)
         print(n, " ", time)
     
 w = wave2phy(nx,ny,wnf)            
@@ -583,7 +557,7 @@ if (ipr == 3):
     plt.xlabel('$K$')
     plt.ylabel('$E(K)$')
     plt.legend(loc=0)
-    plt.ylim(1e-9,1e-1)
+    plt.ylim(1e-16,1e-1)
     fig.savefig('es_spectral.png', bbox_inches = 'tight', pad_inches = 0)
 
 

@@ -152,7 +152,7 @@ def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
     a = (l11*m11 + 2.0*(l12*m12) + l22*m22)
     b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
-    CS2 = a/b  #Germano
+    #CS2 = a/b  #Germano
     
     #x = np.linspace(0.0,2.0*np.pi,nxc+1)
     #y = np.linspace(0.0,2.0*np.pi,nxc+1)
@@ -162,7 +162,7 @@ def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
     #CS2 = ai/bi # using integration Lilly
     #CS2 = (np.sum(a)/np.sum(b))     #Lilly
     #CS2 = np.abs(np.sum(a)/np.sum(b))     #Lilly
-    #CS2 = 0.04 # constant
+    CS2 = 0.04 # constant
     
     return CS2
 
@@ -208,7 +208,7 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
     
     t11d = t11 - 0.5*(t11+t22)
     t22d = t22 - 0.5*(t11+t22)
-    
+        
     filename = "spectral/data/uc/uc_"+str(int(n))+".csv"
     np.savetxt(filename, uc, delimiter=",")
     filename = "spectral/data/vc/vc_"+str(int(n))+".csv"
@@ -241,7 +241,7 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
     d12 = 0.5*(uy+vx)
     d22 = vy
 
-    da = np.sqrt(2.0*ux*ux + 2.0*vy*vy + (uy+vx)*(uy+vx))
+    da = np.sqrt(2.0*ux*ux + 2.0*vy*vy + (uy+vx)*(uy+vx)) # |S|
     
     CS2 = compute_cs(dxc,dyc,nxc,nyc,uc,vc,da,d11,d12,d22) # for dynamic Smagorinsky
     
@@ -254,6 +254,17 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
     t_s[0,:,:] = t11_s
     t_s[1,:,:] = t12_s
     t_s[2,:,:] = t22_s
+    
+    filename = "spectral/data/gp/ux/ux_"+str(int(n))+".csv"
+    np.savetxt(filename, uc, delimiter=",")
+    filename = "spectral/data/gp/uy/uy_"+str(int(n))+".csv"
+    np.savetxt(filename, vc, delimiter=",")
+    filename = "spectral/data/gp/vx/vx_"+str(int(n))+".csv"
+    np.savetxt(filename, uuc, delimiter=",")
+    filename = "spectral/data/gp/vy/vy_"+str(int(n))+".csv"
+    np.savetxt(filename, uvc, delimiter=",")
+    filename = "spectral/data/gp/S/S_"+str(int(n))+".csv"
+    np.savetxt(filename, vvc, delimiter=",")
     
     with open("spectral/data/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
         outfile.write('# Array shape: {0}\n'.format(t.shape))
@@ -302,9 +313,10 @@ dy = ly/np.float64(ny)
 
 dxc = lx/np.float64(nxc)
 dyc = ly/np.float64(nyc)
+
 #%%
 for n in range(1,ns+1):
-    file_input = "spectral/data/streamfunction/s_"+str(n)+".csv"
+    file_input = "spectral/data/05_streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')
     #u,v = compute_velocity(nx,ny,dx,dy,s)
     sx,sy = grad_spectral(nx,ny,s)
