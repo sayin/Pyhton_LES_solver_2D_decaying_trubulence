@@ -4,7 +4,15 @@
 Created on Fri Jul  5 12:51:13 2019
 
 @author: Suraj Pawar
+
+DNS solver for decaying homegenous isotropic turbulence problem for cartesian periodic 
+domain with [0,2pi] X [0,2pi] dimension and is discretized uniformly in x and y direction. 
+The solver uses pseudo-spectral method for solving two-dimensional incompressible 
+Navier-Stokes equation in vorticity-streamfunction formulation. The solver employs 
+hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme for time integration. 
+
 """
+
 import numpy as np
 from numpy.random import seed
 seed(1)
@@ -19,52 +27,23 @@ font = {'family' : 'Times New Roman',
         'size'   : 14}    
 plt.rc('font', **font)
 
-#%% 
-# read input file
-l1 = []
-with open('input.txt') as f:
-    for l in f:
-        l1.append((l.strip()).split("\t"))
-
-nd = np.int64(l1[0][0])
-nt = np.int64(l1[1][0])
-re = np.float64(l1[2][0])
-dt = np.float64(l1[3][0])
-ns = np.int64(l1[4][0])
-isolver = np.int64(l1[5][0])
-isc = np.int64(l1[6][0])
-ich = np.int64(l1[7][0])
-ipr = np.int64(l1[8][0])
-ndc = np.int64(l1[9][0])
-
-freq = int(nt/ns)
-
-if (ich != 19):
-    print("Check input.txt file")
-
-# assign parameters
-nx = nd
-ny = nd
-
-nxc = ndc
-nyc = ndc
-
-pi = np.pi
-lx = 2.0*pi
-ly = 2.0*pi
-
-dx = lx/np.float64(nx)
-dy = ly/np.float64(ny)
-
-dxc = lx/np.float64(nxc)
-dyc = ly/np.float64(nyc)
-
-ifile = 0
-time = 0.0
-
 #%%
-# compute exact solution for TGV problem
 def exact_tgv(nx,ny,time,re):
+    
+    '''
+    compute exact solution for TGV problem
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction
+    time : time at which the exact solution is to be computed
+    re : Reynolds number
+    
+    Output
+    ------
+    ue : exact solution for TGV problem
+    '''
+    
     ue = np.empty((nx+1,ny+1))
     x = np.linspace(0.0,2.0*np.pi,nx+1)
     y = np.linspace(0.0,2.0*np.pi,ny+1)
@@ -77,8 +56,20 @@ def exact_tgv(nx,ny,time,re):
     return ue
 
 #%%
-# set initial condition for TGV problem
 def tgv_ic(nx,ny):
+    
+    '''
+    compute initial condition for TGV problem
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction
+    
+    Output
+    ------
+    w : initial condiition for vorticity for TGV problem
+    '''
+    
     w = np.empty((nx+1,ny+1))
     nq = 4.0
     x = np.linspace(0.0,2.0*np.pi,nx+1)
@@ -90,8 +81,20 @@ def tgv_ic(nx,ny):
     return w
 
 #%%
-# set initial condition for vortex merger problem
 def vm_ic(nx,ny):
+    
+    '''
+    compute initial condition for vortex-merger problem
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction
+    
+    Output
+    ------
+    w : initial condiition for vorticity for vortex-merger problem
+    '''
+    
     w = np.empty((nx+1,ny+1))
 
     sigma = np.pi
@@ -112,6 +115,20 @@ def vm_ic(nx,ny):
 
 #%%
 def pbc(nx,ny,u):
+    
+    '''
+    assign periodic boundary condition in physical space
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction
+    u : solution field
+    
+    Output
+    ------
+    u : solution field with periodic boundary condition applied
+    '''    
+    
     u[:,ny] = u[:,0]
     u[nx,:] = u[0,:]
     u[nx,ny] = u[0,0]
@@ -119,6 +136,20 @@ def pbc(nx,ny,u):
 #%%
 # set initial condition for decay of turbulence problem
 def decay_ic(nx,ny,dx,dy):
+    
+    '''
+    assign initial condition for vorticity for DHIT problem
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction
+    dx,dy : grid spacing in x and y direction
+    
+    Output
+    ------
+    w : initial condition for vorticity for DHIT problem
+    '''
+    
     w = np.empty((nx+1,ny+1))
     
     epsilon = 1.0e-6
@@ -180,23 +211,52 @@ def decay_ic(nx,ny,dx,dy):
     return w
 
 #%%
-def wave2phy(nx,ny,wf):
-    w = np.empty((nx+1,ny+1))
+def wave2phy(nx,ny,uf):
+    
+    '''
+    Converts the field form frequency domain to the physical space.
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction
+    uf : solution field in frequency domain (excluding periodic boundaries)
+    
+    Output
+    ------
+    u : solution in physical space (along with periodic boundaries)
+    '''
+    
+    u = np.empty((nx+1,ny+1))
     a = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
     b = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
     
     fft_object_inv = pyfftw.FFTW(a, b,axes = (0,1), direction = 'FFTW_BACKWARD')
 
-    w[0:nx,0:ny] = np.real(fft_object_inv(wf))
+    u[0:nx,0:ny] = np.real(fft_object_inv(uf))
     # periodic BC
-    w[:,ny] = w[:,0]
-    w[nx,:] = w[0,:]
+    u[:,ny] = u[:,0]
+    u[nx,:] = u[0,:]
     
-    return w
+    return u
 
 #%%
 # compute the energy spectrum numerically
 def energy_spectrum(nx,ny,w):
+    
+    '''
+    Computation of energy spectrum and maximum wavenumber from vorticity field
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction
+    w : vorticity field in physical spce (including periodic boundaries)
+    
+    Output
+    ------
+    en : energy spectrum computed from vorticity field
+    n : maximum wavenumber
+    '''
+    
     epsilon = 1.0e-6
 
     kx = np.empty(nx)
@@ -244,6 +304,22 @@ def energy_spectrum(nx,ny,w):
 #%%
 # fast poisson solver using second-order central difference scheme
 def fps(nx,ny,dx,dy,k2,f):
+    
+    '''
+    FFT based fast poisson solver 
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction
+    dx,dy : grid spacing in x and y direction
+    k2 : absolute wavenumber over 2D domain
+    f : right hand side of poisson equation in frequency domain (excluding periodic boundaries)
+    
+    Output
+    ------
+    u : solution to the Poisson eqution in physical space (including periodic boundaries)
+    '''
+    
     u = np.zeros((nx+1,ny+1))
          
     a = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
@@ -263,6 +339,21 @@ def fps(nx,ny,dx,dy,k2,f):
 
 #%%
 def coarsen(nx,ny,nxc,nyc,uf):  
+    
+    '''
+    coarsen the data along with the size of the data 
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    nxc,nyc : number of grid points in x and y direction on coarse grid
+    uf : solution field on fine grid in frequency domain (excluding periodic boundaries)
+    
+    Output
+    ------
+    u : caorsened solution in frequency domain (excluding periodic boundaries)
+    '''
+    
     ufc = np.zeros((nxc,nyc),dtype='complex')
     
     ufc[0:int(nxc/2),0:int(nyc/2)] = uf[0:int(nxc/2),0:int(nyc/2)]
@@ -277,6 +368,23 @@ def coarsen(nx,ny,nxc,nyc,uf):
        
 #%%
 def nonlineardealiased(nx,ny,kx,ky,k2,wf):    
+    
+    '''
+    compute the Jacobian with 3/2 dealiasing 
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    kx,ky : wavenumber in x and y direction
+    k2 : absolute wave number over 2D domain
+    wf : vorticity field in frequency domain (excluding periodic boundaries)
+    
+    Output
+    ------
+    jf : jacobian in frequency domain (excluding periodic boundaries)
+         (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
+    '''
+    
     j1f = 1.0j*kx*wf/k2
     j2f = 1.0j*ky*wf
     j3f = 1.0j*ky*wf/k2
@@ -360,6 +468,23 @@ def nonlineardealiased(nx,ny,kx,ky,k2,wf):
 
 #%%
 def nonlinear(nx,ny,kx,ky,k2,wf):  
+    
+    '''
+    compute the Jacobian without dealiasing 
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    kx,ky : wavenumber in x and y direction
+    k2 : absolute wave number over 2D domain
+    wf : vorticity field in frequency domain (excluding periodic boundaries)
+    
+    Output
+    ------
+    jf : jacobian in frequency domain (excluding periodic boundaries)
+         (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
+    '''
+    
     j1f = 1.0j*kx*wf/k2
     j2f = 1.0j*ky*wf
     j3f = 1.0j*ky*wf/k2
@@ -401,7 +526,32 @@ def nonlinear(nx,ny,kx,ky,k2,wf):
 
 #%% coarsening
 def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,n,freq):
-    s = fps(nx,ny,dx,dy,k2,wf)
+    
+    '''
+    write the data to .csv files for post-processing
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    dx,dy : grid spacing in x and y direction
+    kx,ky : wavenumber in x and y direction
+    k2 : absolute wave number over 2D domain
+    nxc,nyc : number of grid points in x and y direction on caorse grid
+    dxc,dyc : grid spacing in x and y direction for coarse grid
+    wf : vorticity field in frequency domain (excluding periodic boundaries)
+    n : time step
+    freq : frequency at which to write the data
+    
+    Output/ write
+    ------
+    jc : coarsening of Jacobian computed at fine grid
+    jcoarse : Jacobian computed for coarsed solution field
+    sgs : subgrid scale term
+    w : vorticity in physical space for fine grid (including periodic boundaries)
+    s : streamfunction in physical space for fine grid (including periodic boundaries) 
+    '''
+    
+    s = fps(nx,ny,dx,dy,k2,-wf)
    
     kxc = np.fft.fftfreq(nxc,1/nxc)
     kyc = np.fft.fftfreq(nyc,1/nyc)
@@ -434,19 +584,63 @@ def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,n,freq):
     np.savetxt(filename, w, delimiter=",")
     filename = "spectral/data/05_streamfunction/s_"+str(int(n/freq))+".csv"
     np.savetxt(filename, s, delimiter=",")
+
+#%% 
+# read input file
+l1 = []
+with open('input.txt') as f:
+    for l in f:
+        l1.append((l.strip()).split("\t"))
+
+nd = np.int64(l1[0][0])
+nt = np.int64(l1[1][0])
+re = np.float64(l1[2][0])
+dt = np.float64(l1[3][0])
+ns = np.int64(l1[4][0])
+isolver = np.int64(l1[5][0])
+isc = np.int64(l1[6][0])
+ich = np.int64(l1[7][0])
+ipr = np.int64(l1[8][0])
+ndc = np.int64(l1[9][0])
+
+freq = int(nt/ns)
+
+if (ich != 19):
+    print("Check input.txt file")
+
+# assign parameters
+nx = nd
+ny = nd
+
+nxc = ndc
+nyc = ndc
+
+pi = np.pi
+lx = 2.0*pi
+ly = 2.0*pi
+
+dx = lx/np.float64(nx)
+dy = ly/np.float64(ny)
+
+dxc = lx/np.float64(nxc)
+dyc = ly/np.float64(nyc)
+
+ifile = 0
+time = 0.0
     
 #%%
 # set the initial condition based on the problem selected
 if (ipr == 1):
-    w0 = tgv_ic(nx,ny)
+    w0 = tgv_ic(nx,ny) # taylor-green vortex problem
 elif (ipr == 2):
-    w0 = vm_ic(nx,ny)
+    w0 = vm_ic(nx,ny) # vortex-merger problem
 elif (ipr == 3):
-    w0 = decay_ic(nx,ny,dx,dy)
+    w0 = decay_ic(nx,ny,dx,dy) # decaying homegeneous isotropic turbulence problem
     
 w = np.copy(w0)
 
 #%%
+# compute frequencies, vorticity field in frequency domain
 kx = np.fft.fftfreq(nx,1/nx)
 ky = np.fft.fftfreq(ny,1/ny)
 
@@ -465,6 +659,7 @@ fft_object = pyfftw.FFTW(a, b, axes = (0,1), direction = 'FFTW_FORWARD')
 wnf = fft_object(data) # fourier space forward
 
 #%%
+# initialize variables for time integration
 a1, a2, a3 = 8.0/15.0, 2.0/15.0, 1.0/3.0
 g1, g2, g3 = 8.0/15.0, 5.0/12.0, 3.0/4.0
 r2, r3 = -17.0/60.0, -5.0/12.0
@@ -482,32 +677,36 @@ w2f = np.empty((nx,ny), dtype='complex128')
 
 #%%
 clock_time_init = tm.time()
+# time integration using hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme
+# refer to Orlandi: Fluid flow phenomenon
 for n in range(1,nt+1):
     time = time + dt
+    # 1st step
     jnf = nonlineardealiased(nx,ny,kx,ky,k2,wnf)    
     w1f[:,:] = ((1.0 - d1)/(1.0 + d1))*wnf[:,:] + (g1*dt*jnf[:,:])/(1.0 + d1)
     w1f[0,0] = 0.0
     
+    # 2nd step
     j1f = nonlineardealiased(nx,ny,kx,ky,k2,w1f)
     w2f[:,:] = ((1.0 - d2)/(1.0 + d2))*w1f[:,:] + (r2*dt*jnf[:,:]+ g2*dt*j1f[:,:])/(1.0 + d2)
     w2f[0,0] = 0.0
     
+    # 3rd step
     j2f = nonlineardealiased(nx,ny,kx,ky,k2,w2f)
     wnf[:,:] = ((1.0 - d3)/(1.0 + d3))*w2f[:,:] + (r3*dt*j1f[:,:] + g3*dt*j2f[:,:])/(1.0 + d3)
     wnf[0,0] = 0.0
     
     if (n%freq == 0):
-        #w = wave2phy(nx,ny,wnf)
         write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wnf,n,freq)
         print(n, " ", time)
     
-w = wave2phy(nx,ny,wnf)            
+w = wave2phy(nx,ny,wnf) # final vorticity field in physical space            
 
 total_clock_time = tm.time() - clock_time_init
 print('Total clock time=', total_clock_time)  
 
 #%%
-# compute the exact, initial and final energy spectrum
+# compute the exact, initial and final energy spectrum for DHIT problem
 if (ipr == 3):
     en, n = energy_spectrum(nx,ny,w)
     en0, n = energy_spectrum(nx,ny,w0)
@@ -541,6 +740,7 @@ fig.savefig("field_spectral.png", bbox_inches = 'tight')
 
 
 #%%
+# energy spectrum plot for DHIT problem
 if (ipr == 3):
     #en_a = np.loadtxt("energy_arakawa_"+str(nd)+"_"+str(int(re))+".csv") 
     fig, ax = plt.subplots()

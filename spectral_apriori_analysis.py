@@ -4,6 +4,8 @@
 Created on Thu Jul  4 09:37:02 2019
 
 @author: Suraj Pawar
+
+
 """
 
 import numpy as np
@@ -23,30 +25,60 @@ plt.rc('font', **font)
 
 
 #%%
-def coarsen(nx,ny,nxc,nyc,w,wc):
-    wf = np.fft.fft2(w[0:nx,0:ny])
+def coarsen(nx,ny,nxc,nyc,u,uc):
     
-    wfc = np.zeros((nxc,nyc),dtype='complex')
+    '''
+    coarsen the solution field along with the size of the data 
     
-    wfc[0:int(nxc/2),0:int(nyc/2)] = wf[0:int(nxc/2),0:int(nyc/2)]
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    nxc,nyc : number of grid points in x and y direction on coarse grid
+    u : solution field on fine grid
+    
+    Output
+    ------
+    uc : solution field on coarse grid [nxc X nyc]
+    '''
+    
+    uf = np.fft.fft2(u[0:nx,0:ny])
+    
+    ufc = np.zeros((nxc,nyc),dtype='complex')
+    
+    ufc [0:int(nxc/2),0:int(nyc/2)] = uf[0:int(nxc/2),0:int(nyc/2)]
         
-    wfc[int(nxc/2):,0:int(nyc/2)] = wf[int(nx-nxc/2):,0:int(nyc/2)]
+    ufc [int(nxc/2):,0:int(nyc/2)] = uf[int(nx-nxc/2):,0:int(nyc/2)]
     
-    wfc[0:int(nxc/2),int(nyc/2):] = wf[0:int(nxc/2),int(ny-nyc/2):]
+    ufc [0:int(nxc/2),int(nyc/2):] = uf[0:int(nxc/2),int(ny-nyc/2):]
     
-    wfc[int(nxc/2):,int(nyc/2):] =  wf[int(nx-nxc/2):,int(ny-nyc/2):] 
+    ufc [int(nxc/2):,int(nyc/2):] =  uf[int(nx-nxc/2):,int(ny-nyc/2):] 
     
-    wfc = wfc*(nxc*nyc)/(nx*ny)
+    ufc  = ufc *(nxc*nyc)/(nx*ny)
     
-    wtc = np.real(np.fft.ifft2(wfc))
+    utc = np.real(np.fft.ifft2(ufc ))
     
-    wc[0:nxc,0:nyc] = np.real(wtc)
-    wc[:,nyc] = wc[:,0]
-    wc[nxc,:] = wc[0,:]
-    wc[nxc,nyc] = wc[0,0]
+    uc[0:nxc,0:nyc] = np.real(utc)
+    uc[:,nyc] = uc[:,0]
+    uc[nxc,:] = uc[0,:]
+    uc[nxc,nyc] = uc[0,0]
 
 #%%
 def les_filter(nx,ny,nxc,nyc,u,uc):
+    
+    '''
+    coarsen the solution field keeping the size of the data same
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    nxc,nyc : number of grid points in x and y direction on coarse grid
+    u : solution field on fine grid
+    
+    Output
+    ------
+    uc : coarsened solution field [nx X ny]
+    '''
+    
     uf = np.fft.fft2(u[0:nx,0:ny])
         
     uf[int(nxc/2):int(nx-nxc/2),:] = 0.0
@@ -64,6 +96,21 @@ def les_filter(nx,ny,nxc,nyc,u,uc):
 
 #%%
 def grad_spectral(nx,ny,u):
+    
+    '''
+    compute the gradient of u using spectral differentiation
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    u : solution field 
+    
+    Output
+    ------
+    ux : du/dx
+    uy : du/dy
+    '''
+    
     ux = np.empty((nx+1,ny+1))
     uy = np.empty((nx+1,ny+1))
     
@@ -96,6 +143,26 @@ def grad_spectral(nx,ny,u):
             
 #%%
 def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
+    
+    '''
+    compute the Smagorinsky coefficient (dynamic: Germano, Lilys; static)
+    
+    Inputs
+    ------
+    dxc,dyc : grid spacing in x and y direction on coarse grid
+    nxc,nyc : number of grid points in x and y direction on coarse grid
+    uc : x-direction velocity on coarse grid
+    vc : y-direction velocity on coarse grid
+    dac : |S| 
+    d11c : S11 (du/dx)
+    d12c : S12 ((du/dy + dv/dx)/2)
+    d22c : S22 (dv/dy)
+    
+    Output
+    ------
+    CS2 : square of Smagorinsky coefficient
+    '''
+    
     
     alpha = 2.0
     nxcc = int(nxc/alpha)
@@ -152,7 +219,7 @@ def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
     a = (l11*m11 + 2.0*(l12*m12) + l22*m22)
     b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
-    #CS2 = a/b  #Germano
+    CS2 = a/b  #Germano
     
     #x = np.linspace(0.0,2.0*np.pi,nxc+1)
     #y = np.linspace(0.0,2.0*np.pi,nxc+1)
@@ -162,12 +229,30 @@ def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
     #CS2 = ai/bi # using integration Lilly
     #CS2 = (np.sum(a)/np.sum(b))     #Lilly
     #CS2 = np.abs(np.sum(a)/np.sum(b))     #Lilly
-    CS2 = 0.04 # constant
+    #CS2 = 0.04 # constant
     
     return CS2
 
 #%%
 def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
+    
+    '''
+    compute the true stresses and Smagorinsky stresses
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    nxc,nyc : number of grid points in x and y direction on coarse grid
+    dxc,dyc : grid spacing in x and y direction    
+    u : x-direction velocity on fine grid
+    v : y-direction velocity on fine grid
+    n : time-step
+    
+    Output
+    ------
+    uc, vc, uuc, uvc, vvc, t, ts
+    '''
+    
     uc = np.empty((nxc+1,nyc+1))
     vc = np.empty((nxc+1,nyc+1))
     t11 = np.empty((nxc+1,nyc+3))
@@ -324,66 +409,3 @@ for n in range(1,ns+1):
     v = -sx
     compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n)
 
-#%%
-#def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
-#    
-#    alpha = 2.0
-#    nxcc = int(nxc/alpha)
-#    nycc = int(nyc/alpha)
-#    ucc = np.empty((nxcc+3,nycc+3))
-#    vcc = np.empty((nxcc+3,nycc+3))
-#    uucc = np.empty((nxcc+3,nycc+3))
-#    uvcc = np.empty((nxcc+3,nycc+3))
-#    vvcc = np.empty((nxcc+3,nycc+3))
-#    
-#    dacc = np.empty((nxcc+3,nycc+3))
-#    d11cc = np.empty((nxcc+3,nycc+3))
-#    d12cc = np.empty((nxcc+3,nycc+3))
-#    d22cc = np.empty((nxcc+3,nycc+3))
-#    h11cc = np.empty((nxcc+3,nycc+3))
-#    h12cc = np.empty((nxcc+3,nycc+3))
-#    h22cc = np.empty((nxcc+3,nycc+3))
-#
-#    
-#    coarsen(nxc,nyc,nxcc,nycc,uc,ucc)
-#    coarsen(nxc,nyc,nxcc,nycc,vc,vcc)
-#    
-#    uuc = uc*uc
-#    vvc = vc*vc
-#    uvc = uc*vc
-#    
-#    coarsen(nxc,nyc,nxcc,nycc,uuc,uucc)
-#    coarsen(nxc,nyc,nxcc,nycc,uvc,uvcc)
-#    coarsen(nxc,nyc,nxcc,nycc,vvc,vvcc)
-#    
-#    coarsen(nxc,nyc,nxcc,nycc,dac,dacc)
-#    coarsen(nxc,nyc,nxcc,nycc,d11c,d11cc)
-#    coarsen(nxc,nyc,nxcc,nycc,d12c,d12cc)
-#    coarsen(nxc,nyc,nxcc,nycc,d22c,d22cc)
-#    
-#    h11c = dac*d11c
-#    h12c = dac*d12c
-#    h22c = dac*d22c
-#    
-#    coarsen(nxc,nyc,nxcc,nycc,h11c,h11cc)
-#    coarsen(nxc,nyc,nxcc,nycc,h12c,h12cc)
-#    coarsen(nxc,nyc,nxcc,nycc,h22c,h22cc)
-#    
-#    l11 = uucc - ucc*ucc
-#    l12 = uvcc - ucc*vcc
-#    l22 = vvcc - vcc*vcc
-#    
-#    delta2 = dxc*dyc
-#    
-#    m11 = 2.0*delta2*(h11cc-alpha*alpha*np.abs(dacc)*d11cc)
-#    m12 = 2.0*delta2*(h12cc-alpha*alpha*np.abs(dacc)*d12cc)
-#    m22 = 2.0*delta2*(h22cc-alpha*alpha*np.abs(dacc)*d22cc)
-#    
-#    a = (l11*m11 + 2.0*(l12*m12) + l22*m22)
-#    b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
-#    
-#    #CS2 = a/b  #Germano
-#    
-#    CS2 = np.abs(np.sum(a)/np.sum(b))     #Lilly
-#    
-#    return CS2
