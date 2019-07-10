@@ -22,6 +22,7 @@ from scipy import linalg
 import matplotlib.pyplot as plt 
 import time as tm
 import matplotlib.ticker as ticker
+import os
 
 font = {'family' : 'Times New Roman',
         'size'   : 14}    
@@ -573,6 +574,14 @@ def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,n,freq):
     jcoarse = wave2phy(nxc,nyc,jcoarsef) # jacobian(coarsened solution field) physical space
     
     sgs = jc - jcoarse
+    
+    if not os.path.exists("spectral"):
+        os.makedirs("spectral/data")
+        os.makedirs("spectral/data/01_coarsened_jacobian_field")
+        os.makedirs("spectral/data/02_jacobian_coarsened_field")
+        os.makedirs("spectral/data/03_subgrid_scale_term")
+        os.makedirs("spectral/data/04_vorticity")
+        os.makedirs("spectral/data/05_streamfunction")
     
     filename = "spectral/data/01_coarsened_jacobian_field/J_fourier_"+str(int(n/freq))+".csv"
     np.savetxt(filename, jc, delimiter=",")    

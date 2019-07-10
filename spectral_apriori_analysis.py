@@ -18,6 +18,7 @@ from scipy import linalg
 import matplotlib.pyplot as plt 
 import time as tm
 import matplotlib.ticker as ticker
+import os
 
 font = {'family' : 'Times New Roman',
         'size'   : 14}    
@@ -293,6 +294,15 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
     
     t11d = t11 - 0.5*(t11+t22)
     t22d = t22 - 0.5*(t11+t22)
+    
+    if not os.path.exists("spectral/data/uc"):
+        os.makedirs("spectral/data/uc")
+        os.makedirs("spectral/data/vc")
+        os.makedirs("spectral/data/uuc")
+        os.makedirs("spectral/data/uvc")
+        os.makedirs("spectral/data/vvc")
+        os.makedirs("spectral/data/true_shear_stress")
+        os.makedirs("spectral/data/smag_shear_stress")
         
     filename = "spectral/data/uc/uc_"+str(int(n))+".csv"
     np.savetxt(filename, uc, delimiter=",")
