@@ -745,7 +745,7 @@ cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
 fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
 plt.show()
 
-fig.savefig("field_spectral.png", bbox_inches = 'tight')
+fig.savefig("field_spectral.pdf", bbox_inches = 'tight')
 
 
 #%%
