@@ -24,7 +24,6 @@ font = {'family' : 'Times New Roman',
         'size'   : 14}    
 plt.rc('font', **font)
 
-
 #%%
 def coarsen(nx,ny,nxc,nyc,u,uc):
     
@@ -143,7 +142,7 @@ def grad_spectral(nx,ny,u):
             
             
 #%%
-def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
+def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics):
     
     '''
     compute the Smagorinsky coefficient (dynamic: Germano, Lilys; static)
@@ -220,7 +219,12 @@ def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
     a = (l11*m11 + 2.0*(l12*m12) + l22*m22)
     b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
-    CS2 = a/b  #Germano
+    if ics == 1:
+        CS2 = a/b  #Germano
+    
+    elif ics == 2:
+        CS2 = 0.04 # constant
+        
     
     #x = np.linspace(0.0,2.0*np.pi,nxc+1)
     #y = np.linspace(0.0,2.0*np.pi,nxc+1)
@@ -230,12 +234,72 @@ def compute_cs(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c):
     #CS2 = ai/bi # using integration Lilly
     #CS2 = (np.sum(a)/np.sum(b))     #Lilly
     #CS2 = np.abs(np.sum(a)/np.sum(b))     #Lilly
-    #CS2 = 0.04 # constant
     
     return CS2
 
 #%%
-def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
+def bardina_stres1(nx,ny,nxc,nyc,u,v):
+    
+    ul = np.empty((nx+1,ny+1))
+    vl = np.empty((nx+1,ny+1))
+    uc = np.empty((nxc+1,nyc+1))
+    vc = np.empty((nxc+1,nyc+1))
+    uuc = np.empty((nxc+1,nyc+1))
+    uvc = np.empty((nxc+1,nyc+1))
+    vvc = np.empty((nxc+1,nyc+1))
+    
+    les_filter(nx,ny,nxc,nyc,u,ul) # ul has same dimension as u
+    les_filter(nx,ny,nxc,nyc,v,vl) # vl has same dimension as v
+    
+    uul = ul*ul
+    uvl = ul*vl
+    vvl = vl*vl
+    
+    coarsen(nx,ny,nxc,nyc,ul,uc)
+    coarsen(nx,ny,nxc,nyc,vl,vc)
+    coarsen(nx,ny,nxc,nyc,uul,uuc)
+    coarsen(nx,ny,nxc,nyc,uvl,uvc)
+    coarsen(nx,ny,nxc,nyc,vvl,vvc)
+       
+    t11_b = uuc - uc*uc
+    t12_b = uvc - uc*vc
+    t22_b = vvc - vc*vc
+    
+    return t11_b, t12_b, t22_b
+
+#%%
+def bardina_stres2(nxc,nyc,uc,vc):
+    
+    alpha = 2
+    nxcc = int(nxc/alpha)
+    nycc = int(nyc/alpha)
+    
+    ucc = np.empty((nxc+1,nyc+1))
+    vcc = np.empty((nxc+1,nyc+1))
+    uucc = np.empty((nxc+1,nyc+1))
+    uvcc = np.empty((nxc+1,nyc+1))
+    vvcc = np.empty((nxc+1,nyc+1))
+    
+    les_filter(nxc,nyc,nxcc,nycc,uc,ucc)
+    les_filter(nxc,nyc,nxcc,nycc,vc,vcc)
+    
+    uuc = uc*uc
+    uvc = uc*vc
+    vvc = vc*vc
+    
+    les_filter(nxc,nyc,nxcc,nycc,uuc,uucc)
+    les_filter(nxc,nyc,nxcc,nycc,uvc,uvcc)
+    les_filter(nxc,nyc,nxcc,nycc,vvc,vvcc)
+    
+    t11_b = uucc - ucc*ucc
+    t12_b = uvcc - ucc*vcc
+    t22_b = vvcc - vcc*vcc
+    
+    return t11_b, t12_b, t22_b
+
+    
+#%%
+def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics):
     
     '''
     compute the true stresses and Smagorinsky stresses
@@ -338,17 +402,30 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
 
     da = np.sqrt(2.0*ux*ux + 2.0*vy*vy + (uy+vx)*(uy+vx)) # |S|
     
-    CS2 = compute_cs(dxc,dyc,nxc,nyc,uc,vc,da,d11,d12,d22) # for dynamic Smagorinsky
+    if ist == 1:
+        CS2 = compute_cs(dxc,dyc,nxc,nyc,uc,vc,da,d11,d12,d22,ics) # for Smagorinsky
+        
+        print(n, " CS = ", np.sqrt(np.max(CS2)), " ", np.sqrt(np.abs(np.min(CS2))))
+           
+        t11_s = - 2.0*CS2*delta*delta*da*d11
+        t12_s = - 2.0*CS2*delta*delta*da*d12
+        t22_s = - 2.0*CS2*delta*delta*da*d22
+        
+        t_s[0,:,:] = t11_s
+        t_s[1,:,:] = t12_s
+        t_s[2,:,:] = t22_s
     
-    print(n, " CS = ", np.sqrt(np.max(CS2)), " ", np.sqrt(np.abs(np.min(CS2))))
-       
-    t11_s = - 2.0*CS2*delta*delta*da*d11
-    t12_s = - 2.0*CS2*delta*delta*da*d12
-    t22_s = - 2.0*CS2*delta*delta*da*d22
-    
-    t_s[0,:,:] = t11_s
-    t_s[1,:,:] = t12_s
-    t_s[2,:,:] = t22_s
+    elif ist == 2:
+        print(n)        
+        
+        t11_b,t12_b,t22_b = bardina_stres1(nx,ny,nxc,nyc,u,v)
+#        t11_b,t12_b,t22_b = bardina_stres2(nxc,nyc,uc,vc)
+        
+        t_s[0,:,:] = t11_b
+        t_s[1,:,:] = t12_b
+        t_s[2,:,:] = t22_b
+        
+        
     
     filename = "spectral/data/gp/ux/ux_"+str(int(n))+".csv"
     np.savetxt(filename, uc, delimiter=",")
@@ -391,6 +468,10 @@ freq = int(nt/ns)
 if (ich != 19):
     print("Check input.txt file")
 
+#%%
+ist = 2         # 1: Smagoronsky, 2: Bardina
+ics = 2         # 1: Germano, 2: static
+
 #%% 
 # assign parameters
 nx = nd
@@ -417,5 +498,65 @@ for n in range(1,ns+1):
     sx,sy = grad_spectral(nx,ny,s)
     u = sy
     v = -sx
-    compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n)
+    compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics)
 
+#%%
+tt = np.genfromtxt("spectral/data/true_shear_stress/t_50.csv", delimiter=',') 
+tt = tt.reshape((3,nxc+1,nyc+1))
+t11t = tt[0,:,:]
+t12t = tt[1,:,:]
+t22t = tt[2,:,:]
+
+ts = np.genfromtxt('spectral/data/smag_shear_stress/ts_50.csv', delimiter=',') 
+ts = ts.reshape((3,nxc+1,nyc+1))
+t11s = ts[0,:,:]
+t12s = ts[1,:,:]
+t22s = ts[2,:,:]
+
+#%%
+num_bins = 64
+
+fig, axs = plt.subplots(1,3,figsize=(12,3.5))
+axs[0].set_yscale('log')
+
+# the histogram of the data
+ntrue, binst, patchest = axs[0].hist(t11t.flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
+                                 label="True")
+ntrue, binst, patchest = axs[0].hist(t11s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
+                                 label="Model")
+
+ntrue, binst, patchest = axs[1].hist(t12t.flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(t12t),4*np.std(t12t)),density=True,
+                                 label="True")
+ntrue, binst, patchest = axs[1].hist(t12s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(t12t),4*np.std(t12t)),density=True,
+                                 label="Model")
+
+ntrue, binst, patchest = axs[2].hist(t22t.flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(t22t),4*np.std(t22t)),density=True,
+                                 label="True")
+ntrue, binst, patchest = axs[2].hist(t22s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(t22t),4*np.std(t22t)),density=True,
+                                 label="Model")
+
+x_ticks = np.arange(-4*np.std(t11t), 4.1*np.std(t11t), np.std(t11t))                                  
+x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
+
+axs[0].set_title(r"$\tau_{11}$")
+#axs[0].set_xticks(x_ticks)                              
+
+axs[1].set_title(r"$\tau_{12}$")
+
+axs[2].set_title(r"$\tau_{22}$")
+
+# Tweak spacing to prevent clipping of ylabel
+axs[0].legend()            
+axs[1].legend()   
+axs[2].legend()   
+
+fig.tight_layout()
+plt.show()
+
+fig.savefig("apriori.pdf", bbox_inches = 'tight')
