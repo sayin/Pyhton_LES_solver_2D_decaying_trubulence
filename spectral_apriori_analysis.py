@@ -350,13 +350,17 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr):
     l12 = uvcc - ucc*vcc
     l22 = vvcc - vcc*vcc
     
+    l11d = l11 - 0.5*(l11 + l22)
+    l12d = l12
+    l22d = l12 - 0.5*(l11 + l22)
+    
     delta2 = dxc*dyc
     
     m11 = 2.0*delta2*(h11cc-alpha*alpha*np.abs(dacc)*d11cc)
     m12 = 2.0*delta2*(h12cc-alpha*alpha*np.abs(dacc)*d12cc)
     m22 = 2.0*delta2*(h22cc-alpha*alpha*np.abs(dacc)*d22cc)
     
-    a = (l11*m11 + 2.0*(l12*m12) + l22*m22)
+    a = (l11d*m11 + 2.0*(l12d*m12) + l22d*m22)
     b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
     if ics == 1:
@@ -554,7 +558,7 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr):
         t_s[1,:,:] = t12_s
         t_s[2,:,:] = t22_s
     
-    elif ist == 3:
+    elif ist == 5:
         print(n)        
         
 #        t11_b,t12_b,t22_b = bardina_stres1(nx,ny,nxc,nyc,u,v)
@@ -656,13 +660,17 @@ def compute_cs_leith(dxc,dyc,nxc,nyc,uc,vc,Wc,d11c,d12c,d22c,ics,ifltr):
     l12 = uvcc - ucc*vcc
     l22 = vvcc - vcc*vcc
     
+    l11d = l11 - 0.5*(l11 + l22)
+    l12d = l12
+    l22d = l12 - 0.5*(l11 + l22)
+    
     delta = np.sqrt(dxc*dyc)
     
     m11 = 2.0*delta**3*(h11cc-alpha**3*np.abs(Wcc)*d11cc)
     m12 = 2.0*delta**3*(h12cc-alpha**3*np.abs(Wcc)*d12cc)
     m22 = 2.0*delta**3*(h22cc-alpha**3*np.abs(Wcc)*d22cc)
     
-    a = (l11*m11 + 2.0*(l12*m12) + l22*m22)
+    a = (l11d*m11 + 2.0*(l12d*m12) + l22d*m22)
     b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
     if ics == 1:
@@ -814,12 +822,233 @@ def compute_stress_leith(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr):
             np.savetxt(outfile, data_slice, delimiter=",")
             outfile.write('# New slice\n')
 
+#%%
+def compute_cs_horiuti(dxc,dyc,nxc,nyc,uc,vc,a11c,a12c,a22c,ics,ifltr):
+    
+    '''
+    compute the Smagorinsky coefficient (dynamic: Germano, Lilys; static)
+    
+    Inputs
+    ------
+    dxc,dyc : grid spacing in x and y direction on coarse grid
+    nxc,nyc : number of grid points in x and y direction on coarse grid
+    uc : x-direction velocity on coarse grid
+    vc : y-direction velocity on coarse grid
+    dac : |S| 
+    d11c : S11 (du/dx)
+    d12c : S12 ((du/dy + dv/dx)/2)
+    d22c : S22 (dv/dy)
+    
+    Output
+    ------
+    CS2 : square of Smagorinsky coefficient
+    '''
+    
+    alpha = 1.6
+    nxcc = int(nxc/alpha)
+    nycc = int(nyc/alpha)
+    ucc = np.empty((nxc+1,nyc+1))
+    vcc = np.empty((nxc+1,nyc+1))
+    uucc = np.empty((nxc+1,nyc+1))
+    uvcc = np.empty((nxc+1,nyc+1))
+    vvcc = np.empty((nxc+1,nyc+1))
+
+    a11cc = np.empty((nxc+1,nyc+1))
+    a12cc = np.empty((nxc+1,nyc+1))
+    a22cc = np.empty((nxc+1,nyc+1))
+    h11cc = np.empty((nxc+1,nyc+1))
+    h12cc = np.empty((nxc+1,nyc+1))
+    h22cc = np.empty((nxc+1,nyc+1))
+
+        
+    all_filter(nxc,nyc,nxcc,nycc,uc,ucc,ifltr)
+    all_filter(nxc,nyc,nxcc,nycc,vc,vcc,ifltr)
+    
+    uuc = uc*uc
+    vvc = vc*vc
+    uvc = uc*vc
+    
+    all_filter(nxc,nyc,nxcc,nycc,uuc,uucc,ifltr)
+    all_filter(nxc,nyc,nxcc,nycc,uvc,uvcc,ifltr)
+    all_filter(nxc,nyc,nxcc,nycc,vvc,vvcc,ifltr)
+    
+    uccx,uccy = grad_spectral(nxc,nyc,ucc)
+    vccx,vccy = grad_spectral(nxc,nyc,vcc)
+    
+    all_filter(nxc,nyc,nxcc,nycc,a11c,a11cc,ifltr)
+    all_filter(nxc,nyc,nxcc,nycc,a12c,a12cc,ifltr)
+    all_filter(nxc,nyc,nxcc,nycc,a22c,a22cc,ifltr)
+    
+    h11cc = 0.5*(uccy+vccx)*(vccx-uccy)
+    h12cc = 0.5*(vccy-uccx)*(vccx-uccy)
+    h22cc = -0.5*(uccy+vccx)*(vccx-uccy)
+       
+    l11 = uucc - ucc*ucc
+    l12 = uvcc - ucc*vcc
+    l22 = vvcc - vcc*vcc
+    
+    l11d = l11 - 0.5*(l11 + l22)
+    l12d = l12
+    l22d = l12 - 0.5*(l11 + l22)
+    
+    delta = np.sqrt(dxc*dyc)
+    
+    m11 = 2.0*delta**2*(a11cc-alpha**2*h11cc)
+    m12 = 2.0*delta**2*(a12cc-alpha**2*h12cc)
+    m22 = 2.0*delta**2*(a22cc-alpha**2*h22cc)
+    
+    a = (l11d*m11 + 2.0*(l12d*m12) + l22d*m22)
+    b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
+    
+    if ics == 1:
+        CH2 = a/b  # dynamic
+    
+    elif ics == 2:
+        CH2 = 0.04 # constant
+    
+    return CH2
+
+#%%
+def compute_stress_horiuti(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr):
+    
+    '''
+    compute the true stresses and Smagorinsky stresses
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    nxc,nyc : number of grid points in x and y direction on coarse grid
+    dxc,dyc : grid spacing in x and y direction    
+    u : x-direction velocity on fine grid
+    v : y-direction velocity on fine grid
+    n : time-step
+    
+    Output
+    ------
+    uc, vc, uuc, uvc, vvc, t, ts
+    '''
+    
+    uc = np.empty((nxc+1,nyc+1))
+    vc = np.empty((nxc+1,nyc+1))
+    t11 = np.empty((nxc+1,nyc+3))
+    t12 = np.empty((nxc+1,nyc+1))
+    t22 = np.empty((nxc+1,nyc+1))
+    t11_s = np.empty((nxc+1,nyc+1))
+    t12_s = np.empty((nxc+1,nyc+1))
+    t22_s = np.empty((nxc+1,nyc+1))
+    t = np.empty((3,nxc+1,nyc+1)) # true shear stress
+    t_s = np.empty((3,nxc+1,nyc+1)) # Smagorinsky shear stress
+    
+    uu = np.empty((nx+1,ny+1))
+    uv = np.empty((nx+1,ny+1))
+    vv = np.empty((nx+1,ny+1))
+    uuc = np.empty((nxc+1,nyc+1))
+    uvc = np.empty((nxc+1,nyc+1))
+    vvc = np.empty((nxc+1,nyc+1))
+    
+    ux = np.empty((nxc+1,nyc+1))
+    uy = np.empty((nxc+1,nyc+1))
+    vx = np.empty((nxc+1,nyc+1))
+    vy = np.empty((nxc+1,nyc+1))
+   
+    uu = u*u
+    uv = u*v
+    vv = v*v
+    
+    coarsen(nx,ny,nxc,nyc,u,uc)
+    coarsen(nx,ny,nxc,nyc,v,vc)
+    coarsen(nx,ny,nxc,nyc,uu,uuc)
+    coarsen(nx,ny,nxc,nyc,uv,uvc)
+    coarsen(nx,ny,nxc,nyc,vv,vvc)
+    
+    #True (deviatoric stress)
+    t11 = uuc -uc*uc
+    t12 = uvc -uc*vc
+    t22 = vvc -vc*vc
+    
+    t11d = t11 - 0.5*(t11+t22)
+    t22d = t22 - 0.5*(t11+t22)
+    
+    if not os.path.exists("spectral/data/uc"):
+        os.makedirs("spectral/data/uc")
+        os.makedirs("spectral/data/vc")
+        os.makedirs("spectral/data/uuc")
+        os.makedirs("spectral/data/uvc")
+        os.makedirs("spectral/data/vvc")
+        os.makedirs("spectral/data/true_shear_stress")
+        os.makedirs("spectral/data/smag_shear_stress")
+        
+    filename = "spectral/data/uc/uc_"+str(int(n))+".csv"
+    np.savetxt(filename, uc, delimiter=",")
+    filename = "spectral/data/vc/vc_"+str(int(n))+".csv"
+    np.savetxt(filename, vc, delimiter=",")
+    filename = "spectral/data/uuc/uuc_"+str(int(n))+".csv"
+    np.savetxt(filename, uuc, delimiter=",")
+    filename = "spectral/data/uvc/uvc_"+str(int(n))+".csv"
+    np.savetxt(filename, uvc, delimiter=",")
+    filename = "spectral/data/vvc/vvc_"+str(int(n))+".csv"
+    np.savetxt(filename, vvc, delimiter=",")
+    
+    t[0,:,:] = t11d
+    t[1,:,:] = t12
+    t[2,:,:] = t22d
+    
+    with open("spectral/data/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
+        outfile.write('# Array shape: {0}\n'.format(t.shape))
+        for data_slice in t:
+            np.savetxt(outfile, data_slice, delimiter=",")
+            outfile.write('# New slice\n')
+
+    delta = np.sqrt(dxc*dyc)
+    
+    ux,uy = grad_spectral(nxc,nyc,uc)
+    vx,vy = grad_spectral(nxc,nyc,vc)
+    
+    a11 = 0.5*(uy+vx)*(vx-uy)
+    a12 = 0.5*(vy-ux)*(vx-uy)
+    a22 = -0.5*(uy+vx)*(vx-uy)
+       
+    CH2 = compute_cs_horiuti(dxc,dyc,nxc,nyc,uc,vc,a11,a12,a22,ics,ifltr) # for Smagorinsky
+    
+    print(n, " CH = ", (np.abs(np.max(CH2)))**(1/2), " ", (np.abs(np.min(CH2)))**(1/2))
+       
+    t11_s = - 2.0*CH2*delta**2*a11
+    t12_s = - 2.0*CH2*delta**2*a12
+    t22_s = - 2.0*CH2*delta**2*a22
+    
+    t_s[0,:,:] = t11_s
+    t_s[1,:,:] = t12_s
+    t_s[2,:,:] = t22_s
+    
+    filename = "spectral/data/gp/ux/ux_"+str(int(n))+".npy"
+    np.save(filename, ux)
+    filename = "spectral/data/gp/uy/uy_"+str(int(n))+".npy"
+    np.save(filename, uy)
+    filename = "spectral/data/gp/vx/vx_"+str(int(n))+".npy"
+    np.save(filename, vx)
+    filename = "spectral/data/gp/vy/vy_"+str(int(n))+".npy"
+    np.save(filename, vy)
+#    filename = "spectral/data/gp/S/S_"+str(int(n))+".npy"
+#    np.save(filename, W)
+    filename = "spectral/data/gp/true/t_"+str(int(n))+".npy"
+    np.save(filename, t.reshape(int(3*(nxc+1)),int(nyc+1)))
+    filename = "spectral/data/gp/smag/ts_"+str(int(n))+".npy"
+    np.save(filename, t_s.reshape(int(3*(nxc+1)),int(nyc+1)))
+    
+    with open("spectral/data/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
+        outfile.write('# Array shape: {0}\n'.format(t.shape))
+        for data_slice in t_s:
+            np.savetxt(outfile, data_slice, delimiter=",")
+            outfile.write('# New slice\n')
+                          
 #%%                          
 def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr):
-    if ist == 1 or ist == 3:
+    if ist == 1 or ist == 5:
         compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr)
     elif ist == 2:
         compute_stress_leith(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr)
+    elif ist == 3:
+        compute_stress_horiuti(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr)
     
 #%% 
 # read input file
@@ -845,7 +1074,7 @@ if (ich != 19):
     print("Check input.txt file")
 
 #%%
-ist = 2         # 1: Smagoronsky, 2: Leith, 3: Bardina
+ist = 3         # 1: Smagoronsky, 2: Leith, 3: Horiuti, 5: Bardina
 ics = 1         # 1: Germano (dynamic), 2: static
 ifltr = 1       # 1: ideal (LES), 2: Trapezoidal, 3: Gaussian, 4: Elliptic
 
