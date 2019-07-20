@@ -26,8 +26,9 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from scipy.interpolate import UnivariateSpline
+from matplotlib.colors import LightSource
 
-import seaborn as sns, numpy as np
+import seaborn as sns
  
 font = {'family' : 'Times New Roman',
         'size'   : 10}    
@@ -281,7 +282,62 @@ def grad_spectral(nx,ny,u):
     
     return ux,uy
             
-            
+
+#%%
+def write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,S,t,t_s,C):
+    
+    if not os.path.exists("spectral/data/uc"):
+        os.makedirs("spectral/data/uc")
+        os.makedirs("spectral/data/vc")
+        os.makedirs("spectral/data/uuc")
+        os.makedirs("spectral/data/uvc")
+        os.makedirs("spectral/data/vvc")
+        os.makedirs("spectral/data/true_shear_stress")
+        os.makedirs("spectral/data/smag_shear_stress")
+        os.makedirs("spectral/data/coefficient")
+        
+    filename = "spectral/data/uc/uc_"+str(int(n))+".csv"
+    np.savetxt(filename, uc, delimiter=",")
+    filename = "spectral/data/vc/vc_"+str(int(n))+".csv"
+    np.savetxt(filename, vc, delimiter=",")
+    filename = "spectral/data/uuc/uuc_"+str(int(n))+".csv"
+    np.savetxt(filename, uuc, delimiter=",")
+    filename = "spectral/data/uvc/uvc_"+str(int(n))+".csv"
+    np.savetxt(filename, uvc, delimiter=",")
+    filename = "spectral/data/vvc/vvc_"+str(int(n))+".csv"
+    np.savetxt(filename, vvc, delimiter=",")
+    filename = "spectral/data/coefficient/c_"+str(int(n))+".csv"
+    np.savetxt(filename, C, delimiter=",")
+    
+    with open("spectral/data/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
+        outfile.write('# Array shape: {0}\n'.format(t.shape))
+        for data_slice in t:
+            np.savetxt(outfile, data_slice, delimiter=",")
+            outfile.write('# New slice\n')
+                          
+    filename = "spectral/data/gp/ux/ux_"+str(int(n))+".npy"
+    np.save(filename, ux)
+    filename = "spectral/data/gp/uy/uy_"+str(int(n))+".npy"
+    np.save(filename, uy)
+    filename = "spectral/data/gp/vx/vx_"+str(int(n))+".npy"
+    np.save(filename, vx)
+    filename = "spectral/data/gp/vy/vy_"+str(int(n))+".npy"
+    np.save(filename, vy)
+    filename = "spectral/data/gp/S/S_"+str(int(n))+".npy"
+    np.save(filename, S)
+    filename = "spectral/data/gp/true/t_"+str(int(n))+".npy"
+    np.save(filename, t.reshape(int(3*(nxc+1)),int(nyc+1)))
+    filename = "spectral/data/gp/smag/ts_"+str(int(n))+".npy"
+    np.save(filename, t_s.reshape(int(3*(nxc+1)),int(nyc+1)))
+    
+    with open("spectral/data/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
+        outfile.write('# Array shape: {0}\n'.format(t.shape))
+        for data_slice in t_s:
+            np.savetxt(outfile, data_slice, delimiter=",")
+            outfile.write('# New slice\n')
+    
+    
+         
 #%%
 def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     
@@ -328,14 +384,17 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     vvc = vc*vc
     uvc = uc*vc
     
+    ucx,ucy = grad_spectral(nxc,nyc,ucc)
+    vcx,vcy = grad_spectral(nxc,nyc,vcc)
+    
     all_filter(nxc,nyc,nxcc,nycc,uuc,uucc,ifltr)
     all_filter(nxc,nyc,nxcc,nycc,uvc,uvcc,ifltr)
     all_filter(nxc,nyc,nxcc,nycc,vvc,vvcc,ifltr)
     
-    all_filter(nxc,nyc,nxcc,nycc,dac,dacc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,d11c,d11cc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,d12c,d12cc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,d22c,d22cc,ifltr)
+    dacc = np.sqrt(2.0*ucx*ucx + 2.0*vcy*vcy + (ucy+vcx)*(ucy+vcx))
+    d11cc = ucx
+    d12cc = 0.5*(ucy+vcx)
+    d22cc = vcy
     
     h11c = np.abs(dac)*d11c
     h12c = np.abs(dac)*d12c
@@ -500,36 +559,10 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     
     t11d = t11 - 0.5*(t11+t22)
     t22d = t22 - 0.5*(t11+t22)
-    
-    if not os.path.exists("spectral/data/uc"):
-        os.makedirs("spectral/data/uc")
-        os.makedirs("spectral/data/vc")
-        os.makedirs("spectral/data/uuc")
-        os.makedirs("spectral/data/uvc")
-        os.makedirs("spectral/data/vvc")
-        os.makedirs("spectral/data/true_shear_stress")
-        os.makedirs("spectral/data/smag_shear_stress")
-        
-    filename = "spectral/data/uc/uc_"+str(int(n))+".csv"
-    np.savetxt(filename, uc, delimiter=",")
-    filename = "spectral/data/vc/vc_"+str(int(n))+".csv"
-    np.savetxt(filename, vc, delimiter=",")
-    filename = "spectral/data/uuc/uuc_"+str(int(n))+".csv"
-    np.savetxt(filename, uuc, delimiter=",")
-    filename = "spectral/data/uvc/uvc_"+str(int(n))+".csv"
-    np.savetxt(filename, uvc, delimiter=",")
-    filename = "spectral/data/vvc/vvc_"+str(int(n))+".csv"
-    np.savetxt(filename, vvc, delimiter=",")
-    
+       
     t[0,:,:] = t11d
     t[1,:,:] = t12
     t[2,:,:] = t22d
-    
-    with open("spectral/data/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
-        outfile.write('# Array shape: {0}\n'.format(t.shape))
-        for data_slice in t:
-            np.savetxt(outfile, data_slice, delimiter=",")
-            outfile.write('# New slice\n')
 
     #Smagorinsky
     #CS = 0.2
@@ -568,30 +601,8 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
         t_s[1,:,:] = t12_b
         t_s[2,:,:] = t22_b - 0.5*(t11_b+t22_b)
         
-        
+    write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,da,t,t_s,CS2)
     
-    filename = "spectral/data/gp/ux/ux_"+str(int(n))+".npy"
-    np.save(filename, ux)
-    filename = "spectral/data/gp/uy/uy_"+str(int(n))+".npy"
-    np.save(filename, uy)
-    filename = "spectral/data/gp/vx/vx_"+str(int(n))+".npy"
-    np.save(filename, vx)
-    filename = "spectral/data/gp/vy/vy_"+str(int(n))+".npy"
-    np.save(filename, vy)
-    filename = "spectral/data/gp/S/S_"+str(int(n))+".npy"
-    np.save(filename, da)
-    filename = "spectral/data/gp/true/t_"+str(int(n))+".npy"
-    np.save(filename, t.reshape(int(3*(nxc+1)),int(nyc+1)))
-    filename = "spectral/data/gp/smag/ts_"+str(int(n))+".npy"
-    np.save(filename, t_s.reshape(int(3*(nxc+1)),int(nyc+1)))
-    
-    with open("spectral/data/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
-        outfile.write('# Array shape: {0}\n'.format(t.shape))
-        for data_slice in t_s:
-            np.savetxt(outfile, data_slice, delimiter=",")
-            outfile.write('# New slice\n')
-
-
 #%%
 def compute_cs_leith(dxc,dyc,nxc,nyc,uc,vc,Wc,d11c,d12c,d22c,ics,ifltr,alpha):
     
@@ -638,15 +649,21 @@ def compute_cs_leith(dxc,dyc,nxc,nyc,uc,vc,Wc,d11c,d12c,d22c,ics,ifltr,alpha):
     vvc = vc*vc
     uvc = uc*vc
     
+    ucx,ucy = grad_spectral(nxc,nyc,ucc)
+    vcx,vcy = grad_spectral(nxc,nyc,vcc)
+    
     all_filter(nxc,nyc,nxcc,nycc,uuc,uucc,ifltr)
     all_filter(nxc,nyc,nxcc,nycc,uvc,uvcc,ifltr)
     all_filter(nxc,nyc,nxcc,nycc,vvc,vvcc,ifltr)
     
-    all_filter(nxc,nyc,nxcc,nycc,Wc,Wcc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,d11c,d11cc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,d12c,d12cc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,d22c,d22cc,ifltr)
-    
+    wcc = vcx - ucy
+    wccx,wccy = grad_spectral(nxc,nyc,wcc)    
+    Wcc = np.sqrt(wccx*wccx + wccy*wccy)
+
+    d11cc = ucx
+    d12cc = 0.5*(ucy+vcx)
+    d22cc = vcy
+  
     h11c = Wc*d11c
     h12c = Wc*d12c
     h22c = Wc*d22c
@@ -743,35 +760,9 @@ def compute_stress_leith(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     t11d = t11 - 0.5*(t11+t22)
     t22d = t22 - 0.5*(t11+t22)
     
-    if not os.path.exists("spectral/data/uc"):
-        os.makedirs("spectral/data/uc")
-        os.makedirs("spectral/data/vc")
-        os.makedirs("spectral/data/uuc")
-        os.makedirs("spectral/data/uvc")
-        os.makedirs("spectral/data/vvc")
-        os.makedirs("spectral/data/true_shear_stress")
-        os.makedirs("spectral/data/smag_shear_stress")
-        
-    filename = "spectral/data/uc/uc_"+str(int(n))+".csv"
-    np.savetxt(filename, uc, delimiter=",")
-    filename = "spectral/data/vc/vc_"+str(int(n))+".csv"
-    np.savetxt(filename, vc, delimiter=",")
-    filename = "spectral/data/uuc/uuc_"+str(int(n))+".csv"
-    np.savetxt(filename, uuc, delimiter=",")
-    filename = "spectral/data/uvc/uvc_"+str(int(n))+".csv"
-    np.savetxt(filename, uvc, delimiter=",")
-    filename = "spectral/data/vvc/vvc_"+str(int(n))+".csv"
-    np.savetxt(filename, vvc, delimiter=",")
-    
     t[0,:,:] = t11d
     t[1,:,:] = t12
     t[2,:,:] = t22d
-    
-    with open("spectral/data/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
-        outfile.write('# Array shape: {0}\n'.format(t.shape))
-        for data_slice in t:
-            np.savetxt(outfile, data_slice, delimiter=",")
-            outfile.write('# New slice\n')
 
     delta = np.sqrt(dxc*dyc)
     
@@ -801,26 +792,7 @@ def compute_stress_leith(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     t_s[1,:,:] = t12_s
     t_s[2,:,:] = t22_s
     
-    filename = "spectral/data/gp/ux/ux_"+str(int(n))+".npy"
-    np.save(filename, ux)
-    filename = "spectral/data/gp/uy/uy_"+str(int(n))+".npy"
-    np.save(filename, uy)
-    filename = "spectral/data/gp/vx/vx_"+str(int(n))+".npy"
-    np.save(filename, vx)
-    filename = "spectral/data/gp/vy/vy_"+str(int(n))+".npy"
-    np.save(filename, vy)
-    filename = "spectral/data/gp/S/S_"+str(int(n))+".npy"
-    np.save(filename, W)
-    filename = "spectral/data/gp/true/t_"+str(int(n))+".npy"
-    np.save(filename, t.reshape(int(3*(nxc+1)),int(nyc+1)))
-    filename = "spectral/data/gp/smag/ts_"+str(int(n))+".npy"
-    np.save(filename, t_s.reshape(int(3*(nxc+1)),int(nyc+1)))
-    
-    with open("spectral/data/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
-        outfile.write('# Array shape: {0}\n'.format(t.shape))
-        for data_slice in t_s:
-            np.savetxt(outfile, data_slice, delimiter=",")
-            outfile.write('# New slice\n')
+    write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,W,t,t_s,CL3)
 
 #%%
 def compute_cs_horiuti(dxc,dyc,nxc,nyc,uc,vc,a11c,a12c,a22c,ics,ifltr,alpha):
@@ -843,7 +815,7 @@ def compute_cs_horiuti(dxc,dyc,nxc,nyc,uc,vc,a11c,a12c,a22c,ics,ifltr,alpha):
     ------
     CS2 : square of Smagorinsky coefficient
     '''
-    
+
     nxcc = int(nxc/alpha)
     nycc = int(nyc/alpha)
     ucc = np.empty((nxc+1,nyc+1))
@@ -968,36 +940,10 @@ def compute_stress_horiuti(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     t11d = t11 - 0.5*(t11+t22)
     t22d = t22 - 0.5*(t11+t22)
     
-    if not os.path.exists("spectral/data/uc"):
-        os.makedirs("spectral/data/uc")
-        os.makedirs("spectral/data/vc")
-        os.makedirs("spectral/data/uuc")
-        os.makedirs("spectral/data/uvc")
-        os.makedirs("spectral/data/vvc")
-        os.makedirs("spectral/data/true_shear_stress")
-        os.makedirs("spectral/data/smag_shear_stress")
-        
-    filename = "spectral/data/uc/uc_"+str(int(n))+".csv"
-    np.savetxt(filename, uc, delimiter=",")
-    filename = "spectral/data/vc/vc_"+str(int(n))+".csv"
-    np.savetxt(filename, vc, delimiter=",")
-    filename = "spectral/data/uuc/uuc_"+str(int(n))+".csv"
-    np.savetxt(filename, uuc, delimiter=",")
-    filename = "spectral/data/uvc/uvc_"+str(int(n))+".csv"
-    np.savetxt(filename, uvc, delimiter=",")
-    filename = "spectral/data/vvc/vvc_"+str(int(n))+".csv"
-    np.savetxt(filename, vvc, delimiter=",")
-    
     t[0,:,:] = t11d
     t[1,:,:] = t12
     t[2,:,:] = t22d
     
-    with open("spectral/data/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
-        outfile.write('# Array shape: {0}\n'.format(t.shape))
-        for data_slice in t:
-            np.savetxt(outfile, data_slice, delimiter=",")
-            outfile.write('# New slice\n')
-
     delta = np.sqrt(dxc*dyc)
     
     ux,uy = grad_spectral(nxc,nyc,uc)
@@ -1020,27 +966,8 @@ def compute_stress_horiuti(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     t_s[1,:,:] = t12_s
     t_s[2,:,:] = t22_s
     
-    filename = "spectral/data/gp/ux/ux_"+str(int(n))+".npy"
-    np.save(filename, ux)
-    filename = "spectral/data/gp/uy/uy_"+str(int(n))+".npy"
-    np.save(filename, uy)
-    filename = "spectral/data/gp/vx/vx_"+str(int(n))+".npy"
-    np.save(filename, vx)
-    filename = "spectral/data/gp/vy/vy_"+str(int(n))+".npy"
-    np.save(filename, vy)
-#    filename = "spectral/data/gp/S/S_"+str(int(n))+".npy"
-#    np.save(filename, W)
-    filename = "spectral/data/gp/true/t_"+str(int(n))+".npy"
-    np.save(filename, t.reshape(int(3*(nxc+1)),int(nyc+1)))
-    filename = "spectral/data/gp/smag/ts_"+str(int(n))+".npy"
-    np.save(filename, t_s.reshape(int(3*(nxc+1)),int(nyc+1)))
+    write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,a11,t,t_s,CH2)
     
-    with open("spectral/data/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
-        outfile.write('# Array shape: {0}\n'.format(t.shape))
-        for data_slice in t_s:
-            np.savetxt(outfile, data_slice, delimiter=",")
-            outfile.write('# New slice\n')
-
 #%%
 def compute_cs_hybrid(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,Wc,a11c,a12c,a22c,ics,ifltr,alpha):
     
@@ -1242,35 +1169,9 @@ def compute_stress_hybrid(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     t11d = t11 - 0.5*(t11+t22)
     t22d = t22 - 0.5*(t11+t22)
     
-    if not os.path.exists("spectral/data/uc"):
-        os.makedirs("spectral/data/uc")
-        os.makedirs("spectral/data/vc")
-        os.makedirs("spectral/data/uuc")
-        os.makedirs("spectral/data/uvc")
-        os.makedirs("spectral/data/vvc")
-        os.makedirs("spectral/data/true_shear_stress")
-        os.makedirs("spectral/data/smag_shear_stress")
-        
-    filename = "spectral/data/uc/uc_"+str(int(n))+".csv"
-    np.savetxt(filename, uc, delimiter=",")
-    filename = "spectral/data/vc/vc_"+str(int(n))+".csv"
-    np.savetxt(filename, vc, delimiter=",")
-    filename = "spectral/data/uuc/uuc_"+str(int(n))+".csv"
-    np.savetxt(filename, uuc, delimiter=",")
-    filename = "spectral/data/uvc/uvc_"+str(int(n))+".csv"
-    np.savetxt(filename, uvc, delimiter=",")
-    filename = "spectral/data/vvc/vvc_"+str(int(n))+".csv"
-    np.savetxt(filename, vvc, delimiter=",")
-    
     t[0,:,:] = t11d
     t[1,:,:] = t12
     t[2,:,:] = t22d
-    
-    with open("spectral/data/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
-        outfile.write('# Array shape: {0}\n'.format(t.shape))
-        for data_slice in t:
-            np.savetxt(outfile, data_slice, delimiter=",")
-            outfile.write('# New slice\n')
 
     delta = np.sqrt(dxc*dyc)
     
@@ -1308,28 +1209,7 @@ def compute_stress_hybrid(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     t_s[0,:,:] = t11_s
     t_s[1,:,:] = t12_s
     t_s[2,:,:] = t22_s
-    
-    filename = "spectral/data/gp/ux/ux_"+str(int(n))+".npy"
-    np.save(filename, ux)
-    filename = "spectral/data/gp/uy/uy_"+str(int(n))+".npy"
-    np.save(filename, uy)
-    filename = "spectral/data/gp/vx/vx_"+str(int(n))+".npy"
-    np.save(filename, vx)
-    filename = "spectral/data/gp/vy/vy_"+str(int(n))+".npy"
-    np.save(filename, vy)
-#    filename = "spectral/data/gp/S/S_"+str(int(n))+".npy"
-#    np.save(filename, W)
-    filename = "spectral/data/gp/true/t_"+str(int(n))+".npy"
-    np.save(filename, t.reshape(int(3*(nxc+1)),int(nyc+1)))
-    filename = "spectral/data/gp/smag/ts_"+str(int(n))+".npy"
-    np.save(filename, t_s.reshape(int(3*(nxc+1)),int(nyc+1)))
-    
-    with open("spectral/data/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
-        outfile.write('# Array shape: {0}\n'.format(t.shape))
-        for data_slice in t_s:
-            np.savetxt(outfile, data_slice, delimiter=",")
-            outfile.write('# New slice\n')
-                          
+                              
 #%%                          
 def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     if ist == 1 or ist == 5:
@@ -1461,29 +1341,40 @@ plt.show()
 
 fig.savefig("apriori.pdf", bbox_inches = 'tight')
 
-##%%
-#num_bins = 64
-#
-#fig, axs = plt.subplots(1,1,figsize=(5,5))
-#axs.set_yscale('log')
-#
-## the histogram of the data
-#axs = sns.distplot(t11t.flatten(),hist=True, kde=True, color = 'darkblue', bins = 64,
-#             hist_kws={'edgecolor':'black'},
-#             kde_kws={'linewidth': 3})
-#
-##axs = sns.distplot(t11s.flatten(),hist=True, kde=True, color = 'red', bins = 64,
-##             hist_kws={'edgecolor':'black'},
-##             kde_kws={'linewidth': 3})
-#
-##axs = sns.distplot(t11s.flatten(),hist=True,color = 'red', bins=64,
-##             hist_kws={'edgecolor':'black'},
-##             kde_kws={'linewidth': 4})
-#
-##axs.set_xlim(-4.0*np.std(t11t),4.0*np.std(t11t))
-##axs.set_ylim(1e-2,50)
-#
-#fig.tight_layout()
-#plt.show()
-#
-#fig.savefig("apriori.pdf", bbox_inches = 'tight')
+#%%
+C = np.genfromtxt('spectral/data/coefficient/c_50.csv', delimiter=',') 
+
+fig = plt.figure(figsize=(10,6))
+ax = fig.gca(projection='3d')
+
+X, Y = np.mgrid[0:2.0*np.pi+dxc:dxc, 0:2.0*np.pi+dyc:dyc]
+
+surf = ax.plot_surface(X, Y, C, cmap=cm.coolwarm,
+                       linewidth=0, antialiased=False)
+
+ax.set_zlim(-10, 10)
+ax.view_init(elev=60, azim=30)
+fig.colorbar(surf, shrink=0.5, aspect=5)
+plt.show()
+
+#%%
+C = np.genfromtxt('spectral/data/04_vorticity/w_25.csv', delimiter=',') 
+
+fig = plt.figure(figsize=(10,6))
+ax = fig.gca(projection='3d',proj_type = 'ortho')
+
+X, Y = np.mgrid[0:2.0*np.pi+dx:dx, 0:2.0*np.pi+dy:dy]
+
+surf = ax.plot_surface(X, Y, C, cmap='coolwarm',vmin=-30, vmax=30,
+                       linewidth=0, antialiased=False,rstride=1,
+                        cstride=1)
+
+bounds = np.linspace(-30,30,21)
+
+fig.colorbar(surf, shrink=0.5, aspect=5)
+
+ax.view_init(elev=60, azim=30)
+
+plt.show()
+
+fig.savefig("vorticity_3D.png", bbox_inches = 'tight')

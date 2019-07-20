@@ -526,7 +526,7 @@ def nonlinear(nx,ny,kx,ky,k2,wf):
 
 
 #%% coarsening
-def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,n,freq):
+def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt):
     
     '''
     write the data to .csv files for post-processing
@@ -553,6 +553,7 @@ def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,n,freq):
     '''
     
     s = fps(nx,ny,dx,dy,k2,-wf)
+    w = wave2phy(nx,ny,wf)
    
     kxc = np.fft.fftfreq(nxc,1/nxc)
     kyc = np.fft.fftfreq(nyc,1/nyc)
@@ -575,25 +576,45 @@ def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,n,freq):
     
     sgs = jc - jcoarse
     
-    if not os.path.exists("spectral"):
-        os.makedirs("spectral/data")
-        os.makedirs("spectral/data/01_coarsened_jacobian_field")
-        os.makedirs("spectral/data/02_jacobian_coarsened_field")
-        os.makedirs("spectral/data/03_subgrid_scale_term")
-        os.makedirs("spectral/data/04_vorticity")
-        os.makedirs("spectral/data/05_streamfunction")
+    folder = 'data_'+str(nx)
+    if not os.path.exists("spectral/"+folder):
+        os.makedirs("spectral/"+folder)
+        os.makedirs("spectral/"+folder+"/01_coarsened_jacobian_field")
+        os.makedirs("spectral/"+folder+"/02_jacobian_coarsened_field")
+        os.makedirs("spectral/"+folder+"/03_subgrid_scale_term")
+        os.makedirs("spectral/"+folder+"/04_vorticity")
+        os.makedirs("spectral/"+folder+"/05_streamfunction")
     
-    filename = "spectral/data/01_coarsened_jacobian_field/J_fourier_"+str(int(n/freq))+".csv"
+    filename = "spectral/"+folder+"/01_coarsened_jacobian_field/J_fourier_"+str(int(n/freq))+".csv"
     np.savetxt(filename, jc, delimiter=",")    
-    filename = "spectral/data/02_jacobian_coarsened_field/J_coarsen_"+str(int(n/freq))+".csv"
+    filename = "spectral/"+folder+"/02_jacobian_coarsened_field/J_coarsen_"+str(int(n/freq))+".csv"
     np.savetxt(filename, jcoarse, delimiter=",")
-    filename = "spectral/data/03_subgrid_scale_term/sgs_"+str(int(n/freq))+".csv"
+    filename = "spectral/"+folder+"/03_subgrid_scale_term/sgs_"+str(int(n/freq))+".csv"
     np.savetxt(filename, sgs, delimiter=",")
-    filename = "spectral/data/04_vorticity/w_"+str(int(n/freq))+".csv"
+    filename = "spectral/"+folder+"/04_vorticity/w_"+str(int(n/freq))+".csv"
     np.savetxt(filename, w, delimiter=",")
-    filename = "spectral/data/05_streamfunction/s_"+str(int(n/freq))+".csv"
+    filename = "spectral/"+folder+"/05_streamfunction/s_"+str(int(n/freq))+".csv"
     np.savetxt(filename, s, delimiter=",")
+    
+    if n%(50*freq) == 0:
+        fig, axs = plt.subplots(1,2,sharey=True,figsize=(9,5))
 
+        cs = axs[0].contourf(w0.T, 120, cmap = 'jet', interpolation='bilinear')
+        axs[0].text(0.4, -0.1, '$t = 0.0$', transform=axs[0].transAxes, fontsize=16, fontweight='bold', va='top')
+        
+        cs = axs[1].contourf(w.T, 120, cmap = 'jet', interpolation='bilinear')
+        axs[1].text(0.4, -0.1, '$t = '+str(dt*n)+'$', transform=axs[1].transAxes, fontsize=16, fontweight='bold', va='top')
+        
+        fig.tight_layout() 
+        fig.subplots_adjust(bottom=0.15)
+        
+        cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
+        fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
+            
+        filename = "spectral/"+folder+"/field_spectral_"+str(int(n/freq))+".png"
+        fig.savefig(filename, bbox_inches = 'tight')
+    
+    
 #%% 
 # read input file
 l1 = []
@@ -611,6 +632,8 @@ isc = np.int64(l1[6][0])
 ich = np.int64(l1[7][0])
 ipr = np.int64(l1[8][0])
 ndc = np.int64(l1[9][0])
+ichkp = np.int64(l1[10][0])
+istart = np.int64(l1[11][0])
 
 freq = int(nt/ns)
 
@@ -635,8 +658,8 @@ dxc = lx/np.float64(nxc)
 dyc = ly/np.float64(nyc)
 
 ifile = 0
-time = 0.0
-    
+time = ichkp*freq*istart*dt
+folder = 'data_'+str(nx)
 #%%
 # set the initial condition based on the problem selected
 if (ipr == 1):
@@ -645,9 +668,15 @@ elif (ipr == 2):
     w0 = vm_ic(nx,ny) # vortex-merger problem
 elif (ipr == 3):
     w0 = decay_ic(nx,ny,dx,dy) # decaying homegeneous isotropic turbulence problem
-    
-w = np.copy(w0)
 
+#%%  
+if ichkp == 0:
+    w = np.copy(w0)
+elif ichkp == 1:
+    print(istart)
+    file_input = "spectral/"+folder+"/04_vorticity/w_"+str(istart)+".csv"
+    w = np.genfromtxt(file_input, delimiter=',')
+    
 #%%
 # compute frequencies, vorticity field in frequency domain
 kx = np.fft.fftfreq(nx,1/nx)
@@ -688,7 +717,7 @@ w2f = np.empty((nx,ny), dtype='complex128')
 clock_time_init = tm.time()
 # time integration using hybrid third-order Runge-Kutta implicit Crank-Nicolson scheme
 # refer to Orlandi: Fluid flow phenomenon
-for n in range(1,nt+1):
+for n in range(int(ichkp*istart*freq)+1,nt+1):
     time = time + dt
     # 1st step
     jnf = nonlineardealiased(nx,ny,kx,ky,k2,wnf)    
@@ -706,8 +735,8 @@ for n in range(1,nt+1):
     wnf[0,0] = 0.0
     
     if (n%freq == 0):
-        write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wnf,n,freq)
-        print(n, " ", time)
+        write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wnf,w0,n,freq,dt)
+        print(n, " ", time, " ",wnf.shape[0], " ", wnf.shape[1])
     
 w = wave2phy(nx,ny,wnf) # final vorticity field in physical space            
 
@@ -745,7 +774,7 @@ cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
 fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
 plt.show()
 
-fig.savefig("field_spectral.pdf", bbox_inches = 'tight')
+fig.savefig("field_spectral.png", bbox_inches = 'tight')
 
 
 #%%
