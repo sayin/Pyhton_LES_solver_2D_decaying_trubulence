@@ -280,6 +280,7 @@ def grad_spectral(nx,ny,u):
     uy[nx,:] = uy[0,:]
     uy[nx,ny] = uy[0,0]
     
+#    return uy,ux
     return ux,uy
             
 
@@ -1016,7 +1017,6 @@ def compute_cs_hybrid(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,Wc,a11c,a12c,a22c
     CS2 : square of Smagorinsky coefficient
     '''
     
-    alpha = 1.6
     nxcc = int(nxc/alpha)
     nycc = int(nyc/alpha)
     ucc = np.empty((nxc+1,nyc+1))
@@ -1296,7 +1296,7 @@ dxc = lx/np.float64(nxc)
 dyc = ly/np.float64(nyc)
 folder = 'data_'+str(nx)
 #%%
-for n in range(ns-5,ns+1):
+for n in range(350,ns+1):
     file_input = "spectral/"+folder+"/05_streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')
     #u,v = compute_velocity(nx,ny,dx,dy,s)
@@ -1389,11 +1389,16 @@ plt.show()
 x = np.linspace(0,2.0*np.pi,65)
 y = np.linspace(0,2.0*np.pi,65)
 X, Y = np.meshgrid(x,y)
+
 x = x.reshape(1,65)
 y = y.reshape(65,1)
 z = np.sin(X) + np.sin(Y)
 Z = np.sin(x) + np.sin(y)
 plt.contourf(z)
+
 Zx = np.cos(X)
 Zy = np.cos(Y)
 zx, zy  = grad_spectral(64,64,z)
+
+plt.contourf(zx)
+plt.contourf(zy)

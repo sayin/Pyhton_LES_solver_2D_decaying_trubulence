@@ -24,6 +24,12 @@ import time as tm
 import matplotlib.ticker as ticker
 import os
 
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+from scipy.interpolate import UnivariateSpline
+from matplotlib.colors import LightSource
+
 font = {'family' : 'Times New Roman',
         'size'   : 14}    
 plt.rc('font', **font)
@@ -795,10 +801,25 @@ if (ipr == 3):
     plt.xlabel('$K$')
     plt.ylabel('$E(K)$')
     plt.legend(loc=0)
-    plt.ylim(1e-16,1e-1)
+    plt.ylim(1e-16,1e-0)
     fig.savefig('es_spectral.png', bbox_inches = 'tight', pad_inches = 0)
 
+#%%
+fig = plt.figure(figsize=(10,6))
+ax = fig.gca(projection='3d', proj_type = 'ortho')
 
+X, Y = np.mgrid[0:2.0*np.pi+dx:dx, 0:2.0*np.pi+dy:dy]
+
+surf = ax.plot_surface(X, Y, w, cmap='coolwarm',vmin=-30, vmax=30,
+                       linewidth=0, antialiased=False,rstride=1,
+                        cstride=1)
+
+fig.colorbar(surf, shrink=0.5, aspect=5)
+ax.view_init(elev=60, azim=30)
+plt.show()
+
+#%%
+fig.savefig("vorticity_3D1.png", dpi=300, bbox_inches = 'tight')
 
 
 
