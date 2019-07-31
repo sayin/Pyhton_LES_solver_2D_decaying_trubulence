@@ -304,7 +304,7 @@ def compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n):
     
     CS2 = compute_cs(dxc,dyc,nxc,nyc,uc,vc,da,d11,d12,d22) # for dynamic Smagorinsky
     
-    print(n, " CS = ", np.sqrt(np.max(CS2)), " ", np.sqrt(np.abs(np.min(CS2))))
+    print(n, " CS = ", np.max(CS2), " ", np.min(CS2), " ", np.mean(CS2))
        
     t11_s = - 2.0*CS2*delta*delta*da*d11
     t12_s = - 2.0*CS2*delta*delta*da*d12
@@ -362,7 +362,7 @@ dy = ly/np.float64(ny)
 dxc = lx/np.float64(nxc)
 dyc = ly/np.float64(nyc)
 #%%
-for n in range(1,ns+1):
+for n in range(1,51):
     file_input = "fdm/data/05_streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')
     #u,v = compute_velocity(nx,ny,dx,dy,s)

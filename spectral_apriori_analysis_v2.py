@@ -31,7 +31,7 @@ from matplotlib.colors import LightSource
 import seaborn as sns
  
 font = {'family' : 'Times New Roman',
-        'size'   : 10}    
+        'size'   : 14}    
 plt.rc('font', **font)
 
 #%%
@@ -67,7 +67,7 @@ def coarsen(nx,ny,nxc,nyc,u,uc):
     
     utc = np.real(np.fft.ifft2(ufc ))
     
-    uc[0:nxc,0:nyc] = np.real(utc)
+    uc[0:nxc,0:nyc] = utc
     uc[:,nyc] = uc[:,0]
     uc[nxc,:] = uc[0,:]
     uc[nxc,nyc] = uc[0,0]
@@ -95,9 +95,9 @@ def les_filter(nx,ny,nxc,nyc,u,uc):
         
     uf[:,int(nyc/2):int(ny-nyc/2)] = 0.0
  
-    utc = np.fft.ifft2(uf)
+    utc = np.real(np.fft.ifft2(uf))
     
-    uc[0:nx,0:ny] = np.real(utc)
+    uc[0:nx,0:ny] = utc
     # periodic bc
     uc[:,ny] = uc[:,0]
     uc[nx,:] = uc[0,:]
@@ -284,9 +284,9 @@ def grad_spectral(nx,ny,u):
             
 
 #%%
-def write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,S,t,t_s,C):
+def write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,S,t,t_s,C,nu):
     
-    folder = 'data_'+str(nx)
+    folder = "data_"+ str(nx) #+ "_v2" 
     if not os.path.exists("spectral/"+folder+"/uc"):
         os.makedirs("spectral/"+folder+"/uc")
         os.makedirs("spectral/"+folder+"/vc")
@@ -296,6 +296,7 @@ def write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,S,t,t_s,C):
         os.makedirs("spectral/"+folder+"/true_shear_stress")
         os.makedirs("spectral/"+folder+"/smag_shear_stress")
         os.makedirs("spectral/"+folder+"/coefficient")
+        os.makedirs("spectral/"+folder+"/nu")
         os.makedirs("spectral/"+folder+"/gp/ux")
         os.makedirs("spectral/"+folder+"/gp/uy")
         os.makedirs("spectral/"+folder+"/gp/vx")
@@ -316,6 +317,8 @@ def write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,S,t,t_s,C):
     np.savetxt(filename, vvc, delimiter=",")
     filename = "spectral/"+folder+"/coefficient/c_"+str(int(n))+".csv"
     np.savetxt(filename, C, delimiter=",")
+    filename = "spectral/"+folder+"/nu/nu_"+str(int(n))+".csv"
+    np.savetxt(filename, nu, delimiter=",")
         
     with open("spectral/"+folder+"/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
         outfile.write('# Array shape: {0}\n'.format(t.shape))
@@ -443,8 +446,8 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     h22cc = np.empty((nxc+1,nyc+1))
 
     uuc = uc*uc
-    vvc = vc*vc
     uvc = uc*vc
+    vvc = vc*vc
     
     all_filter(nxc,nyc,nxcc,nycc,uuc,uucc,ifltr)
     all_filter(nxc,nyc,nxcc,nycc,uvc,uvcc,ifltr)
@@ -453,18 +456,18 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     all_filter(nxc,nyc,nxcc,nycc,uc,ucc,ifltr)
     all_filter(nxc,nyc,nxcc,nycc,vc,vcc,ifltr)
         
-    ucx,ucy = grad_spectral(nxc,nyc,ucc)
-    vcx,vcy = grad_spectral(nxc,nyc,vcc)
+    uccx,uccy = grad_spectral(nxc,nyc,ucc)
+    vccx,vccy = grad_spectral(nxc,nyc,vcc)
     
     #dacc = np.sqrt(2.0*ucx*ucx + 2.0*vcy*vcy + (ucy+vcx)*(ucy+vcx))
-    dacc = np.sqrt((ucx-vcy)**2 + (ucy+vcx)**2)
-    d11cc = ucx
-    d12cc = 0.5*(ucy+vcx)
-    d22cc = vcy
+    dacc = np.sqrt((uccx-vccy)**2 + (uccy+vccx)**2)
+    d11cc = uccx
+    d12cc = 0.5*(uccy+vccx)
+    d22cc = vccy
     
-    h11c = np.abs(dac)*d11c
-    h12c = np.abs(dac)*d12c
-    h22c = np.abs(dac)*d22c
+    h11c = dac*d11c
+    h12c = dac*d12c
+    h22c = dac*d22c
     
     all_filter(nxc,nyc,nxcc,nycc,h11c,h11cc,ifltr)
     all_filter(nxc,nyc,nxcc,nycc,h12c,h12cc,ifltr)
@@ -476,31 +479,44 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     
     l11d = l11 - 0.5*(l11 + l22)
     l12d = l12
-    l22d = l12 - 0.5*(l11 + l22)
+    l22d = l22 - 0.5*(l11 + l22)
     
-    delta2 = dxc*dyc
+    delta = np.sqrt(dxc*dyc)
     
-    m11 = 2.0*delta2*(h11cc-alpha*alpha*np.abs(dacc)*d11cc)
-    m12 = 2.0*delta2*(h12cc-alpha*alpha*np.abs(dacc)*d12cc)
-    m22 = 2.0*delta2*(h22cc-alpha*alpha*np.abs(dacc)*d22cc)
+    m11 = 2.0*delta**2*(h11cc-alpha**2*dacc*d11cc)
+    m12 = 2.0*delta**2*(h12cc-alpha**2*dacc*d12cc)
+    m22 = 2.0*delta**2*(h22cc-alpha**2*dacc*d22cc)
     
-    a = (l11d*m11 + 2.0*(l12d*m12) + l22d*m22)
-    b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
+    aa = (l11d*m11 + 2.0*(l12d*m12) + l22d*m22)
+    bb = (m11*m11 + 2.0*(m12*m12) + m22*m22)
+    
+    filename = "spectral/data_2048/lm/lm_"+str(int(n))+".csv"
+    np.savetxt(filename, aa, delimiter=",")
+    filename = "spectral/data_2048/lm/mm_"+str(int(n))+".csv"
+    np.savetxt(filename, bb, delimiter=",")
     
     if ics == 1:
-        CS2 = a/b  #Germano
-    
+#        CS2 = aa/bb  #Germano
+#        CS2 = CS2.clip(0.0)
+#        x = np.linspace(0.0,2.0*np.pi,nxc+1)
+#        y = np.linspace(0.0,2.0*np.pi,nxc+1)
+#        ai = simps(simps(aa[0:nxc+2,0:nyc+2],y),x)
+#        bi = simps(simps(bb[0:nxc+2,0:nyc+2],y),x)
+#        CS2 = (ai/bi)*np.ones((nxc+1,nyc+1))
+        CS2 = (np.sum(np.abs(aa))/np.sum(np.abs(bb)))*np.ones((nxc+1,nyc+1))
+        
     elif ics == 2:
-        CS2 = 0.04*np.ones((nxc+1,nyc+1)) # constant
+        #CS2 = 0.04*np.ones((nxc+1,nyc+1)) # constant
+        CS2 = 0.18**2*np.ones((nxc+1,nyc+1)) # constant
         
     
-    #x = np.linspace(0.0,2.0*np.pi,nxc+1)
-    #y = np.linspace(0.0,2.0*np.pi,nxc+1)
-    #ai = simps(simps(a[1:nxc+2,1:nyc+2],y),x)
-    #bi = simps(simps(b[1:nxc+2,1:nyc+2],y),x)
-    
-    #CS2 = ai/bi # using integration Lilly
-    #CS2 = (np.sum(a)/np.sum(b))     #Lilly
+#    x = np.linspace(0.0,2.0*np.pi,nxc+1)
+#    y = np.linspace(0.0,2.0*np.pi,nxc+1)
+#    ai = simps(simps(a[0:nxc+2,0:nyc+2],y),x)
+#    bi = simps(simps(b[0:nxc+2,0:nyc+2],y),x)
+#    
+#    CS2i = ai/bi # using integration Lilly
+#    CS2 = (np.sum(a)/np.sum(b))     #Lilly
     #CS2 = np.abs(np.sum(a)/np.sum(b))     #Lilly
     
     return CS2
@@ -574,25 +590,25 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     #CS = 0.2
     delta = np.sqrt(dxc*dyc)
     
-    ux,uy = grad_spectral(nxc,nyc,uc)
-    vx,vy = grad_spectral(nxc,nyc,vc)
+    ucx,ucy = grad_spectral(nxc,nyc,uc)
+    vcx,vcy = grad_spectral(nxc,nyc,vc)
       
-    d11 = ux
-    d12 = 0.5*(uy+vx)
-    d22 = vy
+    d11 = ucx
+    d12 = 0.5*(ucy+vcx)
+    d22 = vcy
 
     #da = np.sqrt(2.0*ux*ux + 2.0*vy*vy + (uy+vx)*(uy+vx)) # |S| 
-    da = np.sqrt((ux-vy)**2 + (uy+vx)**2) # |S| 
+    da = np.sqrt((ucx-vcy)**2 + (ucy+vcx)**2) # |S| 
     
     if ist == 1:
         CS2 = compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,da,d11,d12,d22,ics,ifltr,alpha) # for Smagorinsky
-        
-        print(n, " CS = ", np.sqrt(np.max(CS2)), " ", (np.min(CS2)),
-              " ", np.mean((CS2)), " ", np.std((CS2))**(1/2))
+        nu = CS2*delta**2*da
+        print(n, " CS = ", np.max(CS2), " ", (np.min(CS2)),
+              " ", np.mean((CS2)), " ", np.std((CS2)))
 
-        t11_s = - 2.0*CS2*delta*delta*da*d11
-        t12_s = - 2.0*CS2*delta*delta*da*d12
-        t22_s = - 2.0*CS2*delta*delta*da*d22
+        t11_s = - 2.0*CS2*delta**2*da*d11
+        t12_s = - 2.0*CS2*delta**2*da*d12
+        t22_s = - 2.0*CS2*delta**2*da*d22
         
         t_s[0,:,:] = t11_s
         t_s[1,:,:] = t12_s
@@ -608,7 +624,7 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
         t_s[1,:,:] = t12_b
         t_s[2,:,:] = t22_b - 0.5*(t11_b+t22_b)
         
-    write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,da,t,t_s,CS2)
+    write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,da,t,t_s,CS2,nu)
     
 #%%
 def compute_cs_leith(dxc,dyc,nxc,nyc,uc,vc,Wc,d11c,d12c,d22c,ics,ifltr,alpha):
@@ -685,7 +701,7 @@ def compute_cs_leith(dxc,dyc,nxc,nyc,uc,vc,Wc,d11c,d12c,d22c,ics,ifltr,alpha):
     
     l11d = l11 - 0.5*(l11 + l22)
     l12d = l12
-    l22d = l12 - 0.5*(l11 + l22)
+    l22d = l22 - 0.5*(l11 + l22)
     
     delta = np.sqrt(dxc*dyc)
     
@@ -693,14 +709,17 @@ def compute_cs_leith(dxc,dyc,nxc,nyc,uc,vc,Wc,d11c,d12c,d22c,ics,ifltr,alpha):
     m12 = 2.0*delta**3*(h12cc-alpha**3*np.abs(Wcc)*d12cc)
     m22 = 2.0*delta**3*(h22cc-alpha**3*np.abs(Wcc)*d22cc)
     
-    a = (l11d*m11 + 2.0*(l12d*m12) + l22d*m22)
-    b = (m11*m11 + 2.0*(m12*m12) + m22*m22)
+    aa = (l11d*m11 + 2.0*(l12d*m12) + l22d*m22)
+    bb = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
     if ics == 1:
-        CL3 = a/b  # dynamic
+        #CL3 = aa/bb  # dynamic
+        #CL3 = CL3.clip(0.0)
+        CL3 = (np.sum(aa)/np.sum(bb))*np.ones((nxc+1,nyc+1))
+        #CL3 = (np.sum(np.abs(aa))/np.sum(np.abs(bb)))*np.ones((nxc+1,nyc+1))
     
     elif ics == 2:
-        CL3 = 0.008*np.ones((nxc+1,nyc+1)) # constant
+        CL3 = 0.11**3*np.ones((nxc+1,nyc+1)) # constant
     
     return CL3
 
@@ -788,6 +807,8 @@ def compute_stress_leith(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     
     CL3 = compute_cs_leith(dxc,dyc,nxc,nyc,uc,vc,W,d11,d12,d22,ics,ifltr,alpha) # for Smagorinsky
     
+    nu = CL3*delta**3*W
+    
     print(n, " CL = ", np.max(CL3), " ", np.min(CL3), 
           " ", np.mean((CL3)), " ", np.std((CL3)))
        
@@ -799,7 +820,7 @@ def compute_stress_leith(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     t_s[1,:,:] = t12_s
     t_s[2,:,:] = t22_s
     
-    write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,W,t,t_s,CL3)
+    write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,W,t,t_s,CL3,nu)
 
 #%%
 def compute_cs_horiuti(dxc,dyc,nxc,nyc,uc,vc,a11c,a12c,a22c,ics,ifltr,ihr,alpha):
@@ -892,7 +913,8 @@ def compute_cs_horiuti(dxc,dyc,nxc,nyc,uc,vc,a11c,a12c,a22c,ics,ifltr,ihr,alpha)
     
     elif ics == 2:
         CH2 = 1/24.0*np.ones((nxc+1,nyc+1)) # constant
-    
+        #CH2 = 0.03*np.ones((nxc+1,nyc+1)) # constant
+        
     return CH2
 
 #%%
@@ -981,6 +1003,8 @@ def compute_stress_horiuti(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,ihr,alpha):
         
     CH2 = compute_cs_horiuti(dxc,dyc,nxc,nyc,uc,vc,a11,a12,a22,ics,ifltr,ihr,alpha) # for Smagorinsky
     
+    nu = CH2*delta**2
+    
     print(n, " CH = ", np.max(CH2), " ", np.min(CH2),
           " ", np.mean((CH2)), " ", np.std((CH2)))
        
@@ -992,7 +1016,7 @@ def compute_stress_horiuti(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,ihr,alpha):
     t_s[1,:,:] = t12_s
     t_s[2,:,:] = t22_s
     
-    write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,a11,t,t_s,CH2)
+    write_data(uc,vc,uuc,uvc,vvc,ux,uy,vx,vy,a11,t,t_s,CH2,nu)
     
 #%%
 def compute_cs_hybrid(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,Wc,a11c,a12c,a22c,ics,ifltr,alpha):
@@ -1272,7 +1296,7 @@ if (ich != 19):
     print("Check input.txt file")
 
 #%%
-ist = 1         # 1: Smagoronsky, 2: Leith, 3: Horiuti, 4: Hybrid, 5: Bardina
+ist = 3         # 1: Smagoronsky, 2: Leith, 3: Horiuti, 4: Hybrid, 5: Bardina
 ics = 1         # 1: Germano (dynamic), 2: static
 ifltr = 1       # 1: ideal (LES), 2: Trapezoidal, 3: Gaussian, 4: Elliptic
 ihr = 3         # 1: model-1, 2: model-2, 3: model-3
@@ -1294,9 +1318,10 @@ dy = ly/np.float64(ny)
 
 dxc = lx/np.float64(nxc)
 dyc = ly/np.float64(nyc)
-folder = 'data_'+str(nx)
+folder = 'data_'+str(nx)#+"_v2"
+
 #%%
-for n in range(ns-5,ns+1):
+for n in range(ns-10,ns-8):
     file_input = "spectral/"+folder+"/05_streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')
     #u,v = compute_velocity(nx,ny,dx,dy,s)
@@ -1305,23 +1330,29 @@ for n in range(ns-5,ns+1):
     v = -sx
     compute_stress(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,ihr,alpha)
 
+
 #%%
-tt = np.genfromtxt("spectral/"+folder+"/true_shear_stress/t_"+str(ns)+".csv", delimiter=',') 
+tt = np.genfromtxt("spectral/"+folder+"/true_shear_stress/t_"+str(390)+"s.csv", delimiter=',') 
 tt = tt.reshape((3,nxc+1,nyc+1))
 t11t = tt[0,:,:]
 t12t = tt[1,:,:]
 t22t = tt[2,:,:]
 
-ts = np.genfromtxt("spectral/"+folder+"/smag_shear_stress/ts_"+str(ns)+".csv", delimiter=',') 
+ts = np.genfromtxt("spectral/"+folder+"/smag_shear_stress/ts_"+str(390)+"s.csv", delimiter=',') 
 ts = ts.reshape((3,nxc+1,nyc+1))
-t11s = ts[0,:,:]
-t12s = ts[1,:,:]
-t22s = ts[2,:,:]
+t11sm_s = ts[0,:,:]
+t12sm_s = ts[1,:,:]
+t22sm_s = ts[2,:,:]
 
-#%%
+td = np.genfromtxt("spectral/"+folder+"/smag_shear_stress/ts_"+str(390)+"v2.csv", delimiter=',') 
+td = td.reshape((3,nxc+1,nyc+1))
+t11sm_d = td[0,:,:]
+t12sm_d = td[1,:,:]
+t22sm_d = td[2,:,:]
+
 num_bins = 64
 
-fig, axs = plt.subplots(1,3,figsize=(10,3.25))
+fig, axs = plt.subplots(1,3,figsize=(15,5))
 axs[0].set_yscale('log')
 axs[1].set_yscale('log')
 axs[2].set_yscale('log')
@@ -1330,23 +1361,33 @@ axs[2].set_yscale('log')
 ntrue, binst, patchest = axs[0].hist(t11t.flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
                                  label="True")
-ntrue, binst, patchest = axs[0].hist(t11s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
+ntrue, binst, patchest = axs[0].hist(t11sm_s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
-                                 label="Model")
+                                 label="Static")
+ntrue, binst, patchest = axs[0].hist(t11sm_d.flatten(), num_bins, histtype='step', alpha=1, color='g',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
+                                 label="Dynamic")
 
 ntrue, binst, patchest = axs[1].hist(t12t.flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t12t),4*np.std(t12t)),density=True,
                                  label="True")
-ntrue, binst, patchest = axs[1].hist(t12s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
+ntrue, binst, patchest = axs[1].hist(t12sm_s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t12t),4*np.std(t12t)),density=True,
-                                 label="Model")
+                                 label="Static")
+ntrue, binst, patchest = axs[1].hist(t12sm_d.flatten(), num_bins, histtype='step', alpha=1, color='g',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(t12t),4*np.std(t12t)),density=True,
+                                 label="Dynamic")
+
 
 ntrue, binst, patchest = axs[2].hist(t22t.flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t22t),4*np.std(t22t)),density=True,
                                  label="True")
-ntrue, binst, patchest = axs[2].hist(t22s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
+ntrue, binst, patchest = axs[2].hist(t22sm_s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t22t),4*np.std(t22t)),density=True,
-                                 label="Model")
+                                 label="Static")
+ntrue, binst, patchest = axs[2].hist(t22sm_d.flatten(), num_bins, histtype='step', alpha=1, color='g',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(t22t),4*np.std(t22t)),density=True,
+                                 label="Dynamic")
 
 x_ticks = np.arange(-4*np.std(t11t), 4.1*np.std(t11t), np.std(t11t))                                  
 x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
@@ -1366,34 +1407,27 @@ axs[2].legend()
 fig.tight_layout()
 plt.show()
 
-fig.savefig("apriori.pdf", bbox_inches = 'tight')
 
 #%%
-C = np.genfromtxt("spectral/"+folder+"/coefficient/c_"+str(ns)+".csv", delimiter=',') 
 
-fig = plt.figure(figsize=(10,6))
-ax = fig.gca(projection='3d',proj_type = 'ortho')
+aa = np.genfromtxt("spectral/data_2048/lm/lm_"+str(390)+".csv", delimiter=',') 
+bb = np.genfromtxt("spectral/data_2048/lm/mm_"+str(390)+".csv", delimiter=',')
+aa = aa.flatten()
+bb = bb.flatten()
 
-X, Y = np.mgrid[0:2.0*np.pi+dxc:dxc, 0:2.0*np.pi+dyc:dyc]
-
-surf = ax.plot_surface(X, Y, C, cmap=cm.coolwarm,vmin=-0.5, vmax=0.5,
-                       linewidth=0, antialiased=False, rstride=1,
-                        cstride=1)
-
-#ax.set_zlim(-10, 10)
-ax.view_init(elev=45, azim=30)
-fig.colorbar(surf, shrink=0.5, aspect=5)
+plt.scatter(bb, aa)
 plt.show()
 
+
 #%%
-x = np.linspace(0,2.0*np.pi,65)
-y = np.linspace(0,2.0*np.pi,65)
-X, Y = np.meshgrid(x,y)
-x = x.reshape(1,65)
-y = y.reshape(65,1)
-z = np.sin(X) + np.sin(Y)
-Z = np.sin(x) + np.sin(y)
-plt.contourf(z)
-Zx = np.cos(X)
-Zy = np.cos(Y)
-zx, zy  = grad_spectral(64,64,z)
+#x = np.linspace(0,2.0*np.pi,65)
+#y = np.linspace(0,2.0*np.pi,65)
+#X, Y = np.meshgrid(x,y)
+#x = x.reshape(1,65)
+#y = y.reshape(65,1)
+#z = np.sin(X) + np.sin(Y)
+#Z = np.sin(x) + np.sin(y)
+#plt.contourf(z)
+#Zx = np.cos(X)
+#Zy = np.cos(Y)
+#zx, zy  = grad_spectral(64,64,z)

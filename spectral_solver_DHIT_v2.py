@@ -358,7 +358,7 @@ def coarsen(nx,ny,nxc,nyc,uf):
     
     Output
     ------
-    u : caorsened solution in frequency domain (excluding periodic boundaries)
+    ufc : caorsened solution in frequency domain (excluding periodic boundaries)
     '''
     
     ufc = np.zeros((nxc,nyc),dtype='complex')
@@ -392,9 +392,9 @@ def nonlineardealiased(nx,ny,kx,ky,k2,wf):
          (d(psi)/dy*d(omega)/dx - d(psi)/dx*d(omega)/dy)
     '''
     
-    j1f = 1.0j*kx*wf/k2
+    j1f = -1.0j*kx*wf/k2
     j2f = 1.0j*ky*wf
-    j3f = 1.0j*ky*wf/k2
+    j3f = -1.0j*ky*wf/k2
     j4f = 1.0j*kx*wf
     
     nxe = int(nx*2)
@@ -582,7 +582,7 @@ def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt):
     
     sgs = jc - jcoarse
     
-    folder = 'data_'+str(nx)
+    folder = 'data_'+str(nx) + '_v2'
     if not os.path.exists("spectral/"+folder):
         os.makedirs("spectral/"+folder)
         os.makedirs("spectral/"+folder+"/01_coarsened_jacobian_field")
