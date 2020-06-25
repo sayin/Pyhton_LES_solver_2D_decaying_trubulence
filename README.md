@@ -6,5 +6,6 @@ This repository contains python based LES solver (both finite diffrence and spec
 
 <img src="2dturb.png" width="45%" />
 
+**Details of solver can be found at:**
 
-
+   San, Omer, and Anne E. Staples. "High-order methods for decaying two-dimensional homogeneous isotropic turbulence." Computers & Fluids 63 (2012): 105-127.
