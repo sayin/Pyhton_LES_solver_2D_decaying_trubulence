@@ -4,6 +4,7 @@ This repository contains python based LES solver (both finite diffrence and spec
 
 **Result:**              
 
+<img src="2dturb.png" width="85%" />
 "![2dturb](2dturb.png)"
 
 
