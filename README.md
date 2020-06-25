@@ -4,7 +4,7 @@ This repository contains python based LES solver (both finite diffrence and spec
 
 **Result(Vorticity and Energy spectrum plot at different times):**              
 
-<img src="2dturb.png" width="45%" />
+<img src="2dturb.png" width="55%" />
 
 **Details of solver can be found at:**
 
