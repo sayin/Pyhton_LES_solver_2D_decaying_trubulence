@@ -2,9 +2,10 @@
 
 This repository contains python based LES solver (both finite diffrence and spectral) of two-dimensional decaying turbulence also called Kraichnan turbulence. 
 
-**Result:**              
+**Result(Vorticity and Energy spectrum plot at different times):**              
 
-<img src="https://github.com/sayin/Pyhton_LES_solver_2D_decaying_trubulence/tree/master/results/fig1.png" width="100" height="100" >
+<img src="2dturb.png" width="45%" />
 
+**Details of solver can be found at:**
 
-
+   San, Omer, and Anne E. Staples. "High-order methods for decaying two-dimensional homogeneous isotropic turbulence." Computers & Fluids 63 (2012): 105-127.
