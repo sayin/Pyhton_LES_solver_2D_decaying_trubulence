@@ -4,7 +4,7 @@ This repository contains python based LES solver (both finite diffrence and spec
 
 **Result:**              
 
-<img src="https://github.com/sayin/Pyhton_LES_solver_2D_decaying_trubulence/tree/master/results/2dturb.png" width="85%" />
+<img src="https://github.com/sayin/Pyhton_LES_solver_2D_decaying_trubulence/tree/master/results/2dturb.PNG" width="85%" />
 
 
 
