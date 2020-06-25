@@ -1,5 +1,6 @@
-# 2D_Turbulence
-This repository contains code for data-driven (ANN/CNN) LES of two-dimensional turbulence. Now working towards implementing E/SRGAN architecture for upscaling coarser simulation data to DNS field without solving NS equations numerically. 
+># 2D Decaying Turbulence
 
-Work still under Progress. Estimated time to complete -April 2020
+This repository contains LES solver (both finite diffrence and spectral) of two-dimensional decaying turbulence also called Kraichnan turbulence. 
+
+
 
